@@ -10,7 +10,7 @@ import { Badge, Card, Empty, ErrorBox, Field, Loading, Notice, PageHead, StatusB
 import { useAction, useApi } from "@/lib/useApi";
 
 function TemplatesTab() {
-  const canApprove = useCan("settings.write");
+  const canApprove = useCan("templates.approve");
   const { data, error, reload } = useApi<DocTemplate[]>("/api/admin/templates");
   const [open, setOpen] = useState<string | null>(null);
   const [lawyer, setLawyer] = useState("");
@@ -104,8 +104,55 @@ function DocumentsTab() {
   );
 }
 
+type AuditIssue = {
+  severity: "critical" | "warning" | "info"; code: string; title: string; message: string; action: string;
+  document_id: string | null; contract_id: string | null; contract_number: string | null;
+};
+type AuditReport = { checked_documents: number; checked_contracts: number; counts: Record<string, number>; issues: AuditIssue[]; note: string };
+const SEVERITY: Record<string, { title: string; tone: "danger" | "warn" | undefined }> = {
+  critical: { title: "Критично", tone: "danger" }, warning: { title: "Внимание", tone: "warn" }, info: { title: "Для сведения", tone: undefined },
+};
+
+function AuditTab() {
+  const { data, error, loading, reload } = useApi<AuditReport>("/api/admin/document-audit");
+  return (
+    <>
+      <Notice tone="info" title="Что проверяется">
+        Не изменились ли данные карточек после формирования проекта; не изменён ли шаблон; совпадают ли текст и скан
+        подписанного документа с контрольными суммами; не отличается ли цена договора от подписанной; все ли ожидаемые
+        документы есть по договорам. Проверка ничего не исправляет. {data?.note}
+      </Notice>
+      <ErrorBox error={error} />
+      {loading && !data ? <Loading /> : data ? (
+        <Card title={`Замечаний: ${data.issues.length}`} subtitle={`Проверено документов: ${data.checked_documents}, договоров: ${data.checked_contracts}`}
+              actions={<button className="btn btn-sm" onClick={reload}>Проверить снова</button>} flush>
+          {!data.issues.length ? <Empty>Замечаний нет</Empty> : (
+            <table>
+              <thead><tr><th>Уровень</th><th>Замечание</th><th>Что сделать</th><th></th></tr></thead>
+              <tbody>
+                {data.issues.map((i, n) => (
+                  <tr key={`${i.code}-${i.document_id ?? i.contract_id}-${n}`}>
+                    <td><Badge tone={SEVERITY[i.severity].tone}>{SEVERITY[i.severity].title}</Badge></td>
+                    <td>{i.title}<div className="small muted">{i.message}</div></td>
+                    <td className="small">{i.action}</td>
+                    <td className="right small">
+                      {i.document_id ? <Link href={`/documents/${i.document_id}`}>Документ</Link>
+                        : i.contract_id ? <Link href={`/contracts/${i.contract_id}`}>Договор № {i.contract_number}</Link> : null}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+      ) : null}
+    </>
+  );
+}
+
 export default function DocumentsPage() {
-  const [tab, setTab] = useState<"docs" | "templates">("docs");
+  const canAudit = useCan("documents.audit");
+  const [tab, setTab] = useState<"docs" | "templates" | "audit">("docs");
   return (
     <>
       <PageHead title="Документы и шаблоны" subtitle="Документы формируются только из шаблонов и проверенных данных карточек"
@@ -113,8 +160,9 @@ export default function DocumentsPage() {
       <div className="tabs">
         <button className={tab === "docs" ? "active" : ""} onClick={() => setTab("docs")}>Документы</button>
         <button className={tab === "templates" ? "active" : ""} onClick={() => setTab("templates")}>Шаблоны</button>
+        {canAudit ? <button className={tab === "audit" ? "active" : ""} onClick={() => setTab("audit")}>Проверка документов</button> : null}
       </div>
-      {tab === "docs" ? <DocumentsTab /> : <TemplatesTab />}
+      {tab === "docs" ? <DocumentsTab /> : tab === "templates" ? <TemplatesTab /> : <AuditTab />}
     </>
   );
 }

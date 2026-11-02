@@ -3,7 +3,7 @@
 import { api, formatDate, formatDateTime } from "@islamic-car/shared";
 import { useState } from "react";
 
-import { useCan } from "@/components/Shell";
+import { useMe } from "@/components/Shell";
 import { Badge, Card, Empty, ErrorBox, Field, Loading, Notice, PageHead } from "@/components/ui";
 import { useAction, useApi } from "@/lib/useApi";
 
@@ -26,7 +26,7 @@ function ReviewForm({ item, onDone }: { item: Item; onDone: () => void }) {
   return (
     <div className="inline-form" style={{ marginTop: 10 }}>
       <ErrorBox error={action.error} />
-      <Notice tone="info">Фиксируется заключение внешнего специалиста по точному тексту записи. Изменение записи в репозитории снимет заключение.</Notice>
+      <Notice tone="info">Фиксируется заключение специалиста по точному тексту записи. Изменение записи в репозитории снимет заключение.</Notice>
       <div className="form-grid">
         <Field label="ФИО специалиста"><input value={form.reviewer_name} onChange={(e) => setForm({ ...form, reviewer_name: e.target.value })} /></Field>
         <Field label="Роль"><input value={form.reviewer_role} onChange={(e) => setForm({ ...form, reviewer_role: e.target.value })} /></Field>
@@ -41,8 +41,10 @@ function ReviewForm({ item, onDone }: { item: Item; onDone: () => void }) {
 }
 
 export default function KnowledgePage() {
-  const canReview = useCan("knowledge.review");
+  const me = useMe();
   const [library, setLibrary] = useState("legal");
+  // Заключение по библиотеке фиксирует профильный специалист (юрист, бухгалтер, специалист по шариату) или владелец
+  const canReview = me.permissions.includes(`knowledge.review.${library}`);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const { data, error, loading, reload } = useApi<Listing>(`/api/admin/knowledge?library=${library}${q ? `&q=${encodeURIComponent(q)}` : ""}`);

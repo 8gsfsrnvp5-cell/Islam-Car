@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { useCan } from "@/components/Shell";
@@ -17,22 +18,35 @@ export default function ReportsPage() {
 
   return (
     <>
-      <PageHead title="Отчёты" subtitle="Выгрузки для Excel (CSV, разделитель «;», кодировка UTF-8)" />
+      <PageHead title="Отчёты" subtitle="Выгрузки для Excel: XLSX (числа и даты как значения) или CSV (разделитель «;», UTF-8)" />
       <div className="grid grid-2">
         <Card title="Реестр договоров" subtitle="Все подписанные и исполненные договоры с остатками на сегодня">
-          <a className="btn btn-primary" href="/api/admin/reports/contracts.csv">Скачать contracts.csv</a>
+          <div className="actions">
+            <a className="btn btn-primary" href="/api/admin/reports/contracts.xlsx">Excel (XLSX)</a>
+            <a className="btn" href="/api/admin/reports/contracts.csv">CSV</a>
+          </div>
         </Card>
         <Card title="Журнал платежей" subtitle="Все поступления, включая сторнированные — с причинами">
           <div className="form-grid" style={{ marginBottom: 12 }}>
             <Field label="С"><input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
             <Field label="По"><input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
           </div>
-          <a className="btn btn-primary" href={`/api/admin/reports/payments.csv?${params}`}>Скачать payments.csv</a>
+          <div className="actions">
+            <a className="btn btn-primary" href={`/api/admin/reports/payments.xlsx?${params}`}>Excel (XLSX)</a>
+            <a className="btn" href={`/api/admin/reports/payments.csv?${params}`}>CSV</a>
+          </div>
+        </Card>
+        <Card title="Поступления по банковским выпискам" subtitle="Все загруженные поступления с решениями сотрудников">
+          <a className="btn btn-primary" href="/api/admin/reports/bank.xlsx">Excel (XLSX)</a>
+        </Card>
+        <Card title="Аналитика и прогноз" subtitle="План и факт, просрочка, продажи, заявки, прогноз поступлений — шесть листов">
+          <div className="actions">
+            <a className="btn btn-primary" href="/api/admin/analytics.xlsx">Excel (XLSX)</a>
+            <Link className="btn" href="/analytics">Открыть аналитику</Link>
+          </div>
         </Card>
       </div>
-      <Notice tone="info">
-        Аналитика рентабельности по типам автомобилей и договоров, управленческие прогнозы и выгрузка в Excel (XLSX) — версии 3–4.
-      </Notice>
+      <Notice tone="info">Рентабельность по маркам, срокам и взносам — в разделе <Link href="/finance">«Финансы»</Link>.</Notice>
     </>
   );
 }

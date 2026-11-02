@@ -11,6 +11,48 @@ import { useClientApi } from "@/lib/useClientApi";
 
 const ROW_TONE: Record<string, string> = { paid: "ok", overdue: "danger", due_today: "warn", partial: "warn", upcoming: "" };
 
+type OnlineStatus = { enabled: boolean; provider: string; test_mode: boolean };
+
+function OnlinePay({ contractId, suggested }: { contractId: string; suggested: number }) {
+  const online = useClientApi<OnlineStatus>("/api/client/online-payment");
+  const [amount, setAmount] = useState(suggested ? String(suggested / 100) : "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  if (!online.data?.enabled) return null;
+
+  async function pay(e: React.FormEvent) {
+    e.preventDefault();
+    setErr(null);
+    const kopecks = rublesToKopecks(amount);
+    if (!kopecks || Number.isNaN(kopecks)) { setErr("Укажите сумму в рублях"); return; }
+    setBusy(true);
+    try {
+      const intent = await api<{ id: string; confirmation_url: string }>(`/api/client/contracts/${contractId}/online-payments`,
+        { method: "POST", json: { amount_kopecks: kopecks } });
+      window.location.href = intent.confirmation_url;  // страница оплаты платёжного сервиса (или тестовая страница)
+    } catch (ex) {
+      setErr(errorText(ex));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="panel">
+      <h2>Оплатить онлайн</h2>
+      {online.data.test_mode ? <div className="notice warn">Тестовый режим: деньги не списываются.</div> : null}
+      <p className="small muted">Платёж учтётся автоматически, как только платёжный сервис подтвердит оплату. Комиссию за перевод вы не платите,
+        проценты не начисляются.</p>
+      <form className="form" onSubmit={pay}>
+        <div className="form-row">
+          <label className="field"><span>Сумма, ₽</span><input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="decimal" required /></label>
+        </div>
+        {err ? <div className="form-error">{err}</div> : null}
+        <div><button className="btn btn-primary" disabled={busy}>{busy ? "Переход к оплате…" : "Перейти к оплате"}</button></div>
+      </form>
+    </div>
+  );
+}
+
 function todayIso() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -144,6 +186,8 @@ export default function ContractPage() {
           </>
         ) : null}
       </div>
+
+      {c.status === "signed" ? <OnlinePay contractId={c.id} suggested={lg.overdue_kopecks || lg.next_due_kopecks} /> : null}
 
       {c.status === "signed" ? (
         <div className="panel">
