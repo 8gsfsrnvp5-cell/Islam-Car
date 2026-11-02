@@ -31,5 +31,19 @@
       "type": "bool"
     }
   ],
-  "requires_signed_contract": false
+  "requires_signed_contract": false,
+  "legal_refs": [
+    "legal.gk.454",
+    "legal.gk.488",
+    "legal.gk.489",
+    "legal.gk.491",
+    "legal.gk.223",
+    "legal.gk.395",
+    "legal.zozpp.16_1",
+    "legal.152fz.9",
+    "if.murabaha.ownership",
+    "if.murabaha.cost_disclosure",
+    "if.murabaha.fixed_price",
+    "if.murabaha.no_late_increase"
+  ]
 }

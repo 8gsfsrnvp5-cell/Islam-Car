@@ -33,6 +33,7 @@ class Template:
     requires_signed_contract: bool = False
     visible_to_client: bool = False
     params: list[dict] = field(default_factory=list)
+    legal_refs: list[str] = field(default_factory=list)
 
     @property
     def lawyer_points(self) -> list[str]:
@@ -61,6 +62,7 @@ def load_templates() -> dict[str, Template]:
             sha256=hashlib.sha256(meta_raw + b"\0" + body_raw).hexdigest(),
             requires=meta.get("requires", []), requires_signed_contract=meta.get("requires_signed_contract", False),
             visible_to_client=meta.get("visible_to_client", False), params=meta.get("params", []),
+            legal_refs=meta.get("legal_refs", []),
         )
     return result
 

@@ -220,6 +220,11 @@ class CompanySettings(Base):
     next_contract_seq: Mapped[int] = mapped_column(Integer, default=1)
     # Время и частота сообщений клиентам (параметры по ст. 7 230-ФЗ, требуют проверки юристом)
     communication_policy: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Налоговый режим и признак плательщика НДС устанавливает бухгалтер (версия 3)
+    tax_regime: Mapped[str] = mapped_column(String(30), default="")
+    vat_payer: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Управленческая методика резерва — решение владельца, не правовая норма
+    reserve_policy: Mapped[dict] = mapped_column(JSON, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
@@ -250,6 +255,8 @@ class Car(Base):
     purchase_price_kopecks: Mapped[int | None] = mapped_column(BigInteger)
     purchase_date: Mapped[date | None] = mapped_column(Date)
     purchase_document: Mapped[str] = mapped_column(String(300), default="")
+    # У кого куплен автомобиль: individual | company | unknown — влияет на порядок НДС
+    purchased_from: Mapped[str] = mapped_column(String(20), default="unknown")
 
     # Публичные условия
     sale_price_kopecks: Mapped[int] = mapped_column(BigInteger)
@@ -843,3 +850,104 @@ class BackupRun(Base):
     detail: Mapped[str] = mapped_column(Text, default="")
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+# ============================== Версия 3 ==============================
+
+
+class KnowledgeReview(Base):
+    """Заключение специалиста по записи библиотеки знаний. Действует только для точного содержимого (sha256)."""
+
+    __tablename__ = "knowledge_reviews"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(80), index=True)
+    version: Mapped[str] = mapped_column(String(20))
+    content_sha256: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(20))  # approved | rejected
+    reviewer_name: Mapped[str] = mapped_column(String(200))
+    reviewer_role: Mapped[str] = mapped_column(String(60))
+    note: Mapped[str] = mapped_column(Text, default="")
+    reviewed_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class TaxParam(Base):
+    """Параметр налогового правила (ставка, лимит, срок). Используется в расчёте только после утверждения."""
+
+    __tablename__ = "tax_params"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(60), index=True)
+    value: Mapped[str] = mapped_column(String(40))
+    effective_from: Mapped[date] = mapped_column(Date)
+    effective_to: Mapped[date | None] = mapped_column(Date)
+    source_url: Mapped[str] = mapped_column(String(500))
+    note: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="draft", index=True)  # draft | approved | revoked
+    entered_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TaxCalendarEvent(Base):
+    __tablename__ = "tax_calendar_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(300))
+    due_date: Mapped[date] = mapped_column(Date, index=True)
+    knowledge_code: Mapped[str] = mapped_column(String(80), default="")
+    source_url: Mapped[str] = mapped_column(String(500), default="")
+    note: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="open", index=True)  # open | done
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CashSnapshot(Base):
+    """Остаток денежных средств на дату — вносит владелец или бухгалтер по выписке и кассе."""
+
+    __tablename__ = "cash_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    as_of: Mapped[date] = mapped_column(Date, index=True)
+    amount_kopecks: Mapped[int] = mapped_column(BigInteger)
+    note: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class CarCheck(Base):
+    """Результат одного пункта проверки автомобиля до покупки. Записи только добавляются (история)."""
+
+    __tablename__ = "car_checks"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    car_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cars.id"), index=True)
+    item_code: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(20))  # ok | problem | not_applicable | not_checked
+    source: Mapped[str] = mapped_column(String(200))
+    reference: Mapped[str] = mapped_column(String(300), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    evidence_file: Mapped[str] = mapped_column(String(120), default="")
+    evidence_type: Mapped[str] = mapped_column(String(40), default="")
+    evidence_sha256: Mapped[str] = mapped_column(String(64), default="")
+    checked_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    agent_code: Mapped[str] = mapped_column(String(40), index=True)
+    status: Mapped[str] = mapped_column(String(20))  # running | ok | failed
+    triggered_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    findings: Mapped[list] = mapped_column(JSON, default=list)
+    actions: Mapped[list] = mapped_column(JSON, default=list)
+    error: Mapped[str] = mapped_column(Text, default="")

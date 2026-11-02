@@ -28,5 +28,9 @@
       "label": "Пробег при передаче, км",
       "required": true
     }
+  ],
+  "legal_refs": [
+    "legal.gk.223",
+    "legal.gk.454"
   ]
 }

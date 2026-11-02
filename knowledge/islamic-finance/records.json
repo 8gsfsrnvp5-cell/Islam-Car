@@ -1,0 +1,184 @@
+{
+  "library": "islamic-finance",
+  "records": [
+    {
+      "code": "if.murabaha.ownership",
+      "version": "1",
+      "title": "Продавец владеет товаром до продажи",
+      "act": "AAOIFI Shari'ah Standard No. (8) Murabahah",
+      "article": "",
+      "topics": [
+        "murabaha"
+      ],
+      "scope": [
+        "individual_one_off",
+        "ip",
+        "llc"
+      ],
+      "summary": "Продавец приобретает товар в собственность и принимает на себя связанные с этим риски до продажи покупателю. Продажа того, чем продавец не владеет, недопустима.",
+      "source_url": "https://aaoifi.com/",
+      "source_hint": "AAOIFI, стандарт № 8 «Мурабаха» — уточнить пункт",
+      "effective_from": null,
+      "effective_to": null,
+      "last_checked": null,
+      "check": "ownership"
+    },
+    {
+      "code": "if.murabaha.cost_disclosure",
+      "version": "1",
+      "title": "Раскрытие себестоимости и наценки",
+      "act": "AAOIFI Shari'ah Standard No. (8) Murabahah",
+      "article": "",
+      "topics": [
+        "murabaha"
+      ],
+      "scope": [
+        "individual_one_off",
+        "ip",
+        "llc"
+      ],
+      "summary": "В мурабахе покупателю сообщаются стоимость приобретения товара продавцом и размер наценки.",
+      "source_url": "https://aaoifi.com/",
+      "source_hint": "AAOIFI, стандарт № 8 «Мурабаха» — уточнить пункт",
+      "effective_from": null,
+      "effective_to": null,
+      "last_checked": null,
+      "check": "cost_disclosure"
+    },
+    {
+      "code": "if.murabaha.fixed_price",
+      "version": "1",
+      "title": "Окончательная цена фиксируется",
+      "act": "AAOIFI Shari'ah Standard No. (8) Murabahah",
+      "article": "",
+      "topics": [
+        "murabaha"
+      ],
+      "scope": [
+        "individual_one_off",
+        "ip",
+        "llc"
+      ],
+      "summary": "Цена согласуется при заключении и не увеличивается в течение срока рассрочки.",
+      "source_url": "https://aaoifi.com/",
+      "source_hint": "AAOIFI, стандарт № 8 «Мурабаха» — уточнить пункт",
+      "effective_from": null,
+      "effective_to": null,
+      "last_checked": null,
+      "check": "fixed_price"
+    },
+    {
+      "code": "if.murabaha.no_late_increase",
+      "version": "1",
+      "title": "Долг не увеличивается из-за просрочки",
+      "act": "AAOIFI Shari'ah Standard No. (8) Murabahah",
+      "article": "",
+      "topics": [
+        "murabaha",
+        "late_payment"
+      ],
+      "scope": [
+        "individual_one_off",
+        "ip",
+        "llc"
+      ],
+      "summary": "Начисление процентов или увеличение долга за просрочку недопустимо. Иные механизмы (например, обязательство направить средства на благотворительность) — только по решению специалиста.",
+      "source_url": "https://aaoifi.com/",
+      "source_hint": "AAOIFI, стандарт № 8 «Мурабаха» — уточнить пункт",
+      "effective_from": null,
+      "effective_to": null,
+      "last_checked": null,
+      "check": "no_late_increase"
+    },
+    {
+      "code": "if.murabaha.security",
+      "version": "1",
+      "title": "Допустимое обеспечение",
+      "act": "AAOIFI Shari'ah Standard No. (8) Murabahah",
+      "article": "",
+      "topics": [
+        "murabaha",
+        "pledge"
+      ],
+      "scope": [
+        "individual_one_off",
+        "ip",
+        "llc"
+      ],
+      "summary": "Залог товара и поручительство допускаются как обеспечение исполнения обязательства покупателя.",
+      "source_url": "https://aaoifi.com/",
+      "source_hint": "AAOIFI, стандарт № 8 «Мурабаха» — уточнить пункт",
+      "effective_from": null,
+      "effective_to": null,
+      "last_checked": null,
+      "check": "security"
+    },
+    {
+      "code": "if.murabaha.rescheduling",
+      "version": "1",
+      "title": "Перенос сроков без увеличения цены",
+      "act": "AAOIFI Shari'ah Standard No. (8) Murabahah",
+      "article": "",
+      "topics": [
+        "murabaha",
+        "schedule"
+      ],
+      "scope": [
+        "individual_one_off",
+        "ip",
+        "llc"
+      ],
+      "summary": "Изменение графика возможно, но не может сопровождаться увеличением долга.",
+      "source_url": "https://aaoifi.com/",
+      "source_hint": "AAOIFI, стандарт № 8 «Мурабаха» — уточнить пункт",
+      "effective_from": null,
+      "effective_to": null,
+      "last_checked": null,
+      "check": "rescheduling"
+    },
+    {
+      "code": "if.murabaha.real_asset",
+      "version": "1",
+      "title": "Реальный товар, отсутствие фиктивного займа",
+      "act": "AAOIFI Shari'ah Standard No. (8) Murabahah",
+      "article": "",
+      "topics": [
+        "murabaha"
+      ],
+      "scope": [
+        "individual_one_off",
+        "ip",
+        "llc"
+      ],
+      "summary": "Сделка касается реального, идентифицированного товара; недопустимы схемы, при которых товар продаётся и сразу выкупается обратно ради получения денег.",
+      "source_url": "https://aaoifi.com/",
+      "source_hint": "AAOIFI, стандарт № 8 «Мурабаха» — уточнить пункт",
+      "effective_from": null,
+      "effective_to": null,
+      "last_checked": null,
+      "check": "real_asset"
+    },
+    {
+      "code": "if.murabaha.early_payment",
+      "version": "1",
+      "title": "Досрочная оплата и скидка",
+      "act": "AAOIFI Shari'ah Standard No. (8) Murabahah",
+      "article": "",
+      "topics": [
+        "murabaha",
+        "early_payment"
+      ],
+      "scope": [
+        "individual_one_off",
+        "ip",
+        "llc"
+      ],
+      "summary": "Скидка при досрочной оплате возможна по усмотрению продавца; допустимость её закрепления в договоре — по решению специалиста.",
+      "source_url": "https://aaoifi.com/",
+      "source_hint": "AAOIFI, стандарт № 8 «Мурабаха» — уточнить пункт",
+      "effective_from": null,
+      "effective_to": null,
+      "last_checked": null
+    }
+  ]
+}

@@ -53,7 +53,8 @@ def car_staff(car: Car, actor: Actor) -> dict[str, Any]:
     data.update({
         "vin": car.vin, "ownership_status": car.ownership_status, "status": car.status,
         "is_published": car.is_published, "purchase_date": car.purchase_date,
-        "purchase_document": car.purchase_document, "created_at": car.created_at,
+        "purchase_document": car.purchase_document, "purchased_from": car.purchased_from,
+        "created_at": car.created_at,
         "updated_at": car.updated_at, "photos": photo_urls(car, "admin"),
     })
     data.pop("vin_tail")

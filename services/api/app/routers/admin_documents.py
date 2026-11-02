@@ -50,6 +50,7 @@ def template_dict(db: Session, tpl: registry.Template) -> dict:
     return {"code": tpl.code, "title": tpl.title, "version": tpl.version, "scope": tpl.scope,
             "description": tpl.description, "requires": tpl.requires, "params": tpl.params,
             "requires_signed_contract": tpl.requires_signed_contract, "visible_to_client": tpl.visible_to_client,
+            "legal_refs": tpl.legal_refs,
             "sha256": tpl.sha256, "lawyer_points": tpl.lawyer_points,
             "approved": approval is not None,
             "approval": {"lawyer_name": approval.lawyer_name, "approved_at": approval.approved_at,

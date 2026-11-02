@@ -5,11 +5,16 @@ from sqlalchemy import text
 from app.config import get_settings
 from app.db import SessionLocal
 from app.routers import (
+    admin_accounting,
+    admin_agents,
     admin_cars,
+    admin_checks,
     admin_contracts,
     admin_core,
     admin_crm,
     admin_documents,
+    admin_finance,
+    admin_knowledge,
     admin_ops,
     auth,
     client,
@@ -42,7 +47,9 @@ def create_app() -> FastAPI:
         return response
 
     for r in (public.router, auth.router, client.router, admin_core.router, admin_cars.router,
-              admin_crm.router, admin_contracts.router, admin_documents.router, admin_ops.router):
+              admin_crm.router, admin_contracts.router, admin_documents.router, admin_ops.router,
+              admin_knowledge.router, admin_accounting.router, admin_finance.router, admin_checks.router,
+              admin_agents.router):
         app.include_router(r)
 
     @app.get("/api/health")

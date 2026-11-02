@@ -14,5 +14,9 @@
   ],
   "requires_signed_contract": true,
   "visible_to_client": false,
-  "params": []
+  "params": [],
+  "legal_refs": [
+    "legal.gk.339_1",
+    "legal.notary.103_1"
+  ]
 }
