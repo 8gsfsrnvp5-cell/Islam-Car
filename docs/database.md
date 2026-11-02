@@ -50,6 +50,19 @@ PostgreSQL, миграции Alembic (`services/api/alembic/versions`). Моде
 Также добавлены: `clients.phone_verified`, `clients.email_verified`, `company_settings.communication_policy`,
 `contracts.schedule_version`. Суммы из SQL-агрегатов приводятся к BIGINT (`sum_kopecks`).
 
+## Таблицы версии 3
+
+| Таблица | Назначение |
+|---|---|
+| `knowledge_reviews` | заключения специалистов по записям библиотек (код, редакция, SHA-256, роль) |
+| `tax_params` | параметры налоговых правил: значение, период, источник, черновик/утверждён/отозван |
+| `tax_calendar_events` | налоговые сроки, внесённые бухгалтером |
+| `cash_snapshots` | остатки денежных средств на дату |
+| `car_checks` | результаты проверки автомобиля до покупки (история, источник, подтверждение) |
+| `agent_runs` | запуски агентов: выводы, действия, ошибки |
+
+Также добавлены: `company_settings.tax_regime`, `vat_payer`, `reserve_policy`; `cars.purchased_from`.
+
 ## Как считается остаток долга
 
 Распределение платежей по графику **не хранится**, а вычисляется функцией `compute_ledger`
