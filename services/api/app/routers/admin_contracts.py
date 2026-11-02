@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, date, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -35,7 +35,7 @@ from app.schemas import (
 from app.security import Actor, require
 from app.serializers import contract_staff, payment_dict, report_dict
 from app.services import audit
-from app.services.common import today
+from app.services.common import sum_kopecks, today
 from app.services.contracts import (
     apply_terms,
     get_company,
@@ -47,6 +47,7 @@ from app.services.contracts import (
     terms_of,
 )
 from app.services.dashboard import live_ledgers
+from app.services.messaging import dispatch_payment_confirmed
 from app.services.notify import notify_client, rub
 from app.services.schedule import Terms, TermsError, build_schedule
 
@@ -289,9 +290,8 @@ def confirm_payment(data: PaymentIn, actor: Actor = Depends(require("payments.co
     sync_completion(db, c)
     audit.record(db, actor, "payment.confirmed", "payment", p.id, contract=c.number, amount=p.amount_kopecks,
                  received_on=p.received_on, document=p.document_ref, corrects=data.corrects_payment_id)
-    notify_client(db, c.client_id, "payment.confirmed",
-                  f"Платёж {rub(p.amount_kopecks)} по договору № {c.number} получен и учтён",
-                  "Благодарим за своевременную оплату.", f"/cabinet/contracts/{c.id}")
+    # Подтверждение оплаты: в кабинет сразу, во внешние каналы — через журнал и очередь с проверками
+    dispatch_payment_confirmed(db, c, p, datetime.now(UTC))
     if c.status == ContractStatus.completed:
         notify_client(db, c.client_id, "contract.completed", f"Договор № {c.number} полностью оплачен",
                       "Обязательства по оплате исполнены.", f"/cabinet/contracts/{c.id}")
@@ -410,7 +410,7 @@ def add_expense(data: ExpenseIn, actor: Actor = Depends(require("expenses.write"
 @router.get("/finance/cars")
 def car_results(actor: Actor = Depends(require("finance.read")), db: Session = Depends(get_db)):
     """Фактический результат по каждому проданному автомобилю (по данным договора и учтённым платежам)."""
-    car_expenses = dict(db.execute(select(Expense.car_id, func.sum(Expense.amount_kopecks))
+    car_expenses = dict(db.execute(select(Expense.car_id, sum_kopecks(Expense.amount_kopecks))
                                    .where(Expense.car_id.is_not(None)).group_by(Expense.car_id)).all())
     rows = []
     for c, lg in live_ledgers(db, today()):

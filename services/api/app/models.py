@@ -218,6 +218,8 @@ class CompanySettings(Base):
     payment_purpose_hint: Mapped[str] = mapped_column(String(300), default="Оплата по договору № {number}")
     contract_prefix: Mapped[str] = mapped_column(String(16), default="IC")
     next_contract_seq: Mapped[int] = mapped_column(Integer, default=1)
+    # Время и частота сообщений клиентам (параметры по ст. 7 230-ФЗ, требуют проверки юристом)
+    communication_policy: Mapped[dict] = mapped_column(JSON, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
@@ -297,6 +299,9 @@ class Client(Base):
     identity_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     identity_verified_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id", use_alter=True, name="fk_clients_identity_verified_by"))
+    # Сведения о долге отправляются только на подтверждённые сотрудником контакты
+    phone_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
@@ -379,6 +384,8 @@ class Contract(Base):
     disclose_cost_to_buyer: Mapped[bool] = mapped_column(Boolean, default=True)
     # Без процентов, пеней и штрафов за просрочку — неизменяемое условие модели
     no_interest_on_delay: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Растёт при подписании дополнительного соглашения об изменении графика
+    schedule_version: Mapped[int] = mapped_column(Integer, default=1)
 
     signed_at: Mapped[date | None] = mapped_column(Date)
     signed_confirmed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
@@ -520,3 +527,319 @@ class AuditLog(Base):
     data: Mapped[dict] = mapped_column(JSON, default=dict)
     ip: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+# ============================== Версия 2 ==============================
+
+
+class JobStatus(enum.StrEnum):
+    queued = "queued"
+    running = "running"
+    done = "done"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class Job(Base):
+    """Очередь фоновых задач в PostgreSQL: переживает перезапуск, не требует Redis."""
+
+    __tablename__ = "jobs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(String(40), index=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    dedupe_key: Mapped[str | None] = mapped_column(String(200), unique=True)
+    run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    status: Mapped[JobStatus] = mapped_column(str_enum(JobStatus), default=JobStatus.queued, index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=5)
+    last_error: Mapped[str] = mapped_column(Text, default="")
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class WorkerHeartbeat(Base):
+    __tablename__ = "worker_heartbeats"
+
+    worker_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    jobs_done: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class NotificationEvent(enum.StrEnum):
+    before_due = "before_due"
+    due_day = "due_day"
+    overdue = "overdue"
+    payment_confirmed = "payment_confirmed"
+
+
+class Channel(enum.StrEnum):
+    internal = "internal"  # уведомление в личном кабинете
+    sms = "sms"
+    email = "email"
+
+
+class NotificationRule(Base):
+    __tablename__ = "notification_rules"
+    __table_args__ = (UniqueConstraint("event", "offset_days"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    event: Mapped[NotificationEvent] = mapped_column(str_enum(NotificationEvent))
+    offset_days: Mapped[int] = mapped_column(Integer, default=0)
+    channels: Mapped[list] = mapped_column(JSON, default=list)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class ConsentPurpose(enum.StrEnum):
+    service = "service"      # сервисные сообщения по договору
+    marketing = "marketing"  # реклама — отдельное согласие
+
+
+class Consent(Base):
+    """Каждое изменение согласия — новая запись; действует последняя."""
+
+    __tablename__ = "consents"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    client_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clients.id"), index=True)
+    channel: Mapped[Channel] = mapped_column(str_enum(Channel))
+    purpose: Mapped[ConsentPurpose] = mapped_column(str_enum(ConsentPurpose), default=ConsentPurpose.service)
+    granted: Mapped[bool] = mapped_column(Boolean)
+    source: Mapped[str] = mapped_column(String(200))
+    recorded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class MessageStatus(enum.StrEnum):
+    scheduled = "scheduled"
+    sent = "sent"
+    failed = "failed"
+    cancelled = "cancelled"
+    skipped = "skipped"
+
+
+class OutboundMessage(Base):
+    """Журнал всех сообщений клиентам. event_key защищает от повторной отправки."""
+
+    __tablename__ = "outbound_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    client_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clients.id"), index=True)
+    contract_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("contracts.id"), index=True)
+    channel: Mapped[Channel] = mapped_column(str_enum(Channel))
+    purpose: Mapped[NotificationEvent] = mapped_column(str_enum(NotificationEvent))
+    event_key: Mapped[str] = mapped_column(String(200), unique=True)
+    context: Mapped[dict] = mapped_column(JSON, default=dict)
+    body: Mapped[str] = mapped_column(Text)
+    address_masked: Mapped[str] = mapped_column(String(120), default="")
+    status: Mapped[MessageStatus] = mapped_column(
+        str_enum(MessageStatus), default=MessageStatus.scheduled, index=True)
+    status_reason: Mapped[str] = mapped_column(Text, default="")
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    provider: Mapped[str] = mapped_column(String(40), default="")
+    provider_message_id: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class TemplateApproval(Base):
+    """Утверждение шаблона юристом. Действительно только для точного содержимого файла (sha256)."""
+
+    __tablename__ = "template_approvals"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    template_code: Mapped[str] = mapped_column(String(60), index=True)
+    version: Mapped[str] = mapped_column(String(20))
+    content_sha256: Mapped[str] = mapped_column(String(64))
+    lawyer_name: Mapped[str] = mapped_column(String(200))
+    note: Mapped[str] = mapped_column(Text, default="")
+    approved_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    approved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DocumentStatus(enum.StrEnum):
+    draft = "draft"
+    pending_approval = "pending_approval"
+    approved = "approved"
+    signed = "signed"
+    cancelled = "cancelled"
+
+
+class AddendumStatus(enum.StrEnum):
+    draft = "draft"
+    signed = "signed"
+    cancelled = "cancelled"
+
+
+class Addendum(Base):
+    """Дополнительное соглашение об изменении графика. Цена договора не меняется."""
+
+    __tablename__ = "addenda"
+    __table_args__ = (UniqueConstraint("contract_id", "number"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    contract_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("contracts.id"), index=True)
+    number: Mapped[int] = mapped_column(Integer)
+    status: Mapped[AddendumStatus] = mapped_column(str_enum(AddendumStatus), default=AddendumStatus.draft)
+    reason: Mapped[str] = mapped_column(Text, default="")
+    thread_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("support_threads.id"))
+    term_months: Mapped[int] = mapped_column(Integer)
+    first_payment_date: Mapped[date] = mapped_column(Date)
+    old_schedule: Mapped[list] = mapped_column(JSON, default=list)
+    new_schedule: Mapped[list] = mapped_column(JSON, default=list)
+    base_paid_kopecks: Mapped[int] = mapped_column(BigInteger)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    signed_on: Mapped[date | None] = mapped_column(Date)
+
+
+class Document(Base):
+    """Документ из шаблона. После подписания запись не изменяется."""
+
+    __tablename__ = "documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    contract_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("contracts.id"), index=True)
+    client_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("clients.id"), index=True)
+    addendum_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("addenda.id"))
+    template_code: Mapped[str] = mapped_column(String(60))
+    template_version: Mapped[str] = mapped_column(String(20))
+    template_sha256: Mapped[str] = mapped_column(String(64))
+    template_approved: Mapped[bool] = mapped_column(Boolean)
+    title: Mapped[str] = mapped_column(String(300))
+    status: Mapped[DocumentStatus] = mapped_column(
+        str_enum(DocumentStatus), default=DocumentStatus.draft, index=True)
+    data: Mapped[dict] = mapped_column(JSON, default=dict)
+    checks: Mapped[list] = mapped_column(JSON, default=list)
+    body: Mapped[str] = mapped_column(Text)
+    body_sha256: Mapped[str] = mapped_column(String(64))
+    visible_to_client: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approved_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    signed_on: Mapped[date | None] = mapped_column(Date)
+    signed_recorded_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    signed_file_name: Mapped[str] = mapped_column(String(120), default="")
+    signed_file_type: Mapped[str] = mapped_column(String(40), default="")
+    signed_file_sha256: Mapped[str] = mapped_column(String(64), default="")
+    cancelled_reason: Mapped[str] = mapped_column(Text, default="")
+
+
+class ScheduleHistory(Base):
+    """Прежние версии графика — сохраняются при подписании дополнительного соглашения."""
+
+    __tablename__ = "schedule_history"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    contract_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("contracts.id"), index=True)
+    version: Mapped[int] = mapped_column(Integer)
+    seq: Mapped[int] = mapped_column(Integer)
+    kind: Mapped[str] = mapped_column(String(32))
+    due_date: Mapped[date] = mapped_column(Date)
+    amount_kopecks: Mapped[int] = mapped_column(BigInteger)
+    replaced_by_addendum_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("addenda.id"))
+    archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PledgeStatus(enum.StrEnum):
+    planned = "planned"
+    documents_prepared = "documents_prepared"
+    submitted = "submitted"            # документы переданы нотариусу
+    registered = "registered"          # уведомление внесено в реестр (подтверждено номером)
+    release_required = "release_required"
+    release_submitted = "release_submitted"
+    released = "released"
+    not_required = "not_required"
+
+
+class Pledge(Base):
+    """Внутренний контроль залога. Статусы отражают реальные действия, внесённые сотрудником."""
+
+    __tablename__ = "pledges"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    contract_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("contracts.id"), unique=True)
+    status: Mapped[PledgeStatus] = mapped_column(str_enum(PledgeStatus), default=PledgeStatus.planned)
+    registry_number: Mapped[str] = mapped_column(String(60), default="")
+    registered_on: Mapped[date | None] = mapped_column(Date)
+    notary: Mapped[str] = mapped_column(String(300), default="")
+    release_number: Mapped[str] = mapped_column(String(60), default="")
+    released_on: Mapped[date | None] = mapped_column(Date)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+    contract: Mapped[Contract] = relationship()
+
+
+class InsuranceKind(enum.StrEnum):
+    osago = "osago"
+    kasko = "kasko"
+    other = "other"
+
+
+class InsurancePolicy(Base):
+    __tablename__ = "insurance_policies"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    car_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("cars.id"), index=True)
+    contract_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("contracts.id"), index=True)
+    kind: Mapped[InsuranceKind] = mapped_column(str_enum(InsuranceKind))
+    number: Mapped[str] = mapped_column(String(60))
+    insurer: Mapped[str] = mapped_column(String(200), default="")
+    valid_from: Mapped[date] = mapped_column(Date)
+    valid_to: Mapped[date] = mapped_column(Date, index=True)
+    required_by_contract: Mapped[bool] = mapped_column(Boolean, default=False)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    car: Mapped[Car] = relationship()
+
+
+class TaskStatus(enum.StrEnum):
+    open = "open"
+    done = "done"
+    cancelled = "cancelled"
+
+
+class StaffTask(Base):
+    """Задачи сотрудникам: создаются вручную или фоновым контролем сроков."""
+
+    __tablename__ = "staff_tasks"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(String(40))
+    title: Mapped[str] = mapped_column(String(300))
+    description: Mapped[str] = mapped_column(Text, default="")
+    due_date: Mapped[date | None] = mapped_column(Date, index=True)
+    status: Mapped[TaskStatus] = mapped_column(str_enum(TaskStatus), default=TaskStatus.open, index=True)
+    link: Mapped[str] = mapped_column(String(300), default="")
+    dedupe_key: Mapped[str | None] = mapped_column(String(200), unique=True)
+    assigned_to: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    done_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    result_note: Mapped[str] = mapped_column(Text, default="")
+
+
+class BackupRun(Base):
+    __tablename__ = "backup_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    kind: Mapped[str] = mapped_column(String(20))    # backup | verify
+    status: Mapped[str] = mapped_column(String(20))  # running | ok | failed | skipped
+    file_name: Mapped[str] = mapped_column(String(200), default="")
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
+    sha256: Mapped[str] = mapped_column(String(64), default="")
+    detail: Mapped[str] = mapped_column(Text, default="")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

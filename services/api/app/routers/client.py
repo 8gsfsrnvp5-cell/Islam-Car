@@ -8,11 +8,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.documents.service import is_final
 from app.models import (
+    Addendum,
+    AddendumStatus,
     Application,
     Audience,
+    Channel,
+    Consent,
     Contract,
     ContractStatus,
+    Document,
+    DocumentStatus,
     Notification,
     PaymentReport,
     PaymentStatus,
@@ -20,7 +27,7 @@ from app.models import (
     SupportThread,
     ThreadStatus,
 )
-from app.schemas import MessageIn, PaymentReportIn, ThreadIn
+from app.schemas import ClientConsentIn, MessageIn, PaymentReportIn, ThreadIn
 from app.security import Actor, current_client
 from app.serializers import (
     application_public,
@@ -29,6 +36,7 @@ from app.serializers import (
     report_dict,
     thread_dict,
 )
+from app.services import audit, messaging
 from app.services.common import today
 from app.services.contracts import get_company, ledger_for
 from app.services.export import csv_response, money
@@ -200,3 +208,67 @@ def read_all(actor: Actor = Depends(current_client), db: Session = Depends(get_d
         n.read_at = datetime.now(UTC)
     db.commit()
     return {"ok": True}
+
+
+
+# --- Версия 2: документы, согласия, изменения графика ---
+
+CLIENT_DOC_STATUSES = (DocumentStatus.approved, DocumentStatus.signed)
+
+
+def own_document(db: Session, actor: Actor, doc_id: uuid.UUID) -> Document:
+    doc = db.get(Document, doc_id)
+    contract = db.get(Contract, doc.contract_id) if doc and doc.contract_id else None
+    if (not doc or not doc.visible_to_client or doc.status not in CLIENT_DOC_STATUSES or contract is None
+            or contract.client_id != actor.user.client_id):
+        raise HTTPException(404, "Документ не найден")
+    return doc
+
+
+@router.get("/documents")
+def my_documents(actor: Actor = Depends(current_client), db: Session = Depends(get_db)):
+    """Документы по договорам покупателя, которые утверждены или подписаны и предназначены ему."""
+    rows = db.execute(select(Document, Contract.number).join(Contract, Contract.id == Document.contract_id).where(
+        Contract.client_id == actor.user.client_id, Document.visible_to_client.is_(True),
+        Document.status.in_(CLIENT_DOC_STATUSES)).order_by(Document.created_at.desc())).all()
+    return [{"id": d.id, "title": d.title, "status": d.status, "contract_id": d.contract_id, "contract_number": number,
+             "signed_on": d.signed_on, "final": is_final(d), "created_at": d.created_at} for d, number in rows]
+
+
+@router.get("/documents/{doc_id}/export")
+def my_document_export(doc_id: uuid.UUID, format: str = "pdf", actor: Actor = Depends(current_client),
+                       db: Session = Depends(get_db)):
+    from app.routers.admin_documents import export_response
+    return export_response(own_document(db, actor, doc_id), format)
+
+
+@router.get("/contracts/{contract_id}/schedule-changes")
+def my_schedule_changes(contract_id: uuid.UUID, actor: Actor = Depends(current_client), db: Session = Depends(get_db)):
+    c = own_contract(db, actor, contract_id)
+    rows = db.scalars(select(Addendum).where(Addendum.contract_id == c.id, Addendum.status == AddendumStatus.signed)
+                      .order_by(Addendum.number)).all()
+    return [{"number": a.number, "signed_on": a.signed_on, "term_months": a.term_months,
+             "first_payment_date": a.first_payment_date} for a in rows]
+
+
+@router.get("/communications")
+def my_communications(actor: Actor = Depends(current_client), db: Session = Depends(get_db)):
+    c = actor.user.client
+    consents = messaging.current_consents(db, c.id)
+    return {"channels": [
+        {"channel": "sms", "address": c.phone, "verified": c.phone_verified,
+         "granted": bool(consents.get("sms", {}).get("granted"))},
+        {"channel": "email", "address": c.email, "verified": c.email_verified,
+         "granted": bool(consents.get("email", {}).get("granted"))},
+    ]}
+
+
+@router.post("/communications")
+def set_my_consent(data: ClientConsentIn, actor: Actor = Depends(current_client), db: Session = Depends(get_db)):
+    """Покупатель сам даёт или отзывает согласие на сервисные сообщения по каналу."""
+    db.add(Consent(client_id=actor.user.client_id, channel=Channel(data.channel), granted=data.granted,
+                   source="личный кабинет", recorded_by=actor.user.id))
+    audit.record(db, actor, "client.consent_self", "client", actor.user.client_id, channel=data.channel,
+                 granted=data.granted)
+    db.commit()
+    return my_communications(actor, db)

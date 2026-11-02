@@ -1,0 +1,17 @@
+{
+  "code": "pledge_draft",
+  "version": "0.1-draft",
+  "title": "Проект договора залога автомобиля",
+  "scope": "contract",
+  "description": "Проект для обсуждения с юристом. Регистрация залога — только через нотариуса.",
+  "requires": [
+    "seller.name",
+    "client.full_name",
+    "client.identity_doc",
+    "car.vin",
+    "contract.number"
+  ],
+  "requires_signed_contract": true,
+  "visible_to_client": false,
+  "params": []
+}

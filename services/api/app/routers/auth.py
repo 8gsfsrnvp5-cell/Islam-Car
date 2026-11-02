@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.db import get_db
 from app.models import ActivationToken, Realm, Role, User
 from app.permissions import permissions_for
@@ -35,7 +36,8 @@ BAD_CREDENTIALS = "Неверный логин или пароль"
 def staff_me(actor: Actor) -> dict:
     u = actor.user
     return {"id": u.id, "login": u.login, "full_name": u.full_name, "role": u.role,
-            "totp_enabled": u.totp_enabled, "permissions": permissions_for(u.role)}
+            "totp_enabled": u.totp_enabled, "permissions": permissions_for(u.role),
+            "two_factor_required": u.role == Role.owner and get_settings().owner_2fa_required}
 
 
 @router.post("/admin/login")

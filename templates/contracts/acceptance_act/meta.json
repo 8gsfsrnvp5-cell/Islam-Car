@@ -1,0 +1,32 @@
+{
+  "code": "acceptance_act",
+  "version": "0.1-draft",
+  "title": "Акт приёма-передачи автомобиля",
+  "scope": "contract",
+  "description": "Передача автомобиля и документов покупателю.",
+  "requires": [
+    "seller.name",
+    "client.full_name",
+    "car.vin",
+    "contract.number"
+  ],
+  "requires_signed_contract": true,
+  "visible_to_client": true,
+  "params": [
+    {
+      "name": "place",
+      "label": "Место передачи",
+      "required": false
+    },
+    {
+      "name": "documents_list",
+      "label": "Передаваемые документы и принадлежности",
+      "required": true
+    },
+    {
+      "name": "mileage",
+      "label": "Пробег при передаче, км",
+      "required": true
+    }
+  ]
+}

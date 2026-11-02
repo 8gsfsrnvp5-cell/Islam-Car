@@ -1,0 +1,36 @@
+{
+  "code": "guarantee_draft",
+  "version": "0.1-draft",
+  "title": "Проект договора поручительства",
+  "scope": "contract",
+  "description": "Поручитель отвечает за оплату автомобиля покупателем.",
+  "requires": [
+    "seller.name",
+    "client.full_name",
+    "contract.number"
+  ],
+  "requires_signed_contract": true,
+  "params": [
+    {
+      "name": "guarantor_name",
+      "label": "ФИО поручителя",
+      "required": true
+    },
+    {
+      "name": "guarantor_passport",
+      "label": "Паспорт поручителя (серия, номер, кем и когда выдан)",
+      "required": true
+    },
+    {
+      "name": "guarantor_address",
+      "label": "Адрес регистрации поручителя",
+      "required": true
+    },
+    {
+      "name": "guarantor_phone",
+      "label": "Телефон поручителя",
+      "required": false
+    }
+  ],
+  "visible_to_client": false
+}
