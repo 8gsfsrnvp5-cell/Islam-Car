@@ -1,0 +1,41 @@
+# Секреты и локальные настройки — никогда не коммитить
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Рабочие данные: база, файлы, резервные копии
+storage/
+backups/
+*.db
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+
+# IDE / OS
+.vscode/
+.idea/
+.claude/
+Thumbs.db
+.DS_Store
