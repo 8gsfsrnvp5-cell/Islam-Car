@@ -7,7 +7,10 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 
 import { useApi } from "@/lib/useApi";
 
-export type Me = { id: string; login: string; full_name: string; role: string; totp_enabled: boolean; permissions: string[] };
+export type Me = {
+  id: string; login: string; full_name: string; role: string; totp_enabled: boolean; permissions: string[];
+  two_factor_required?: boolean;
+};
 
 const MeContext = createContext<Me | null>(null);
 
@@ -33,9 +36,11 @@ const NAV: { group: string; items: NavItem[] }[] = [
     { href: "/payments", title: "Рассрочки и платежи" },
     { href: "/calendar", title: "Календарь поступлений" },
     { href: "/support", title: "Обращения клиентов" },
+    { href: "/tasks", title: "Задачи и сроки" },
   ] },
   { group: "Контроль", items: [
-    { href: "/collateral", title: "Залоги и нотариат", soon: 2 },
+    { href: "/documents", title: "Документы и шаблоны" },
+    { href: "/collateral", title: "Залоги и страхование" },
     { href: "/finance", title: "Финансы" },
     { href: "/accounting", title: "Бухгалтерия и налоги", soon: 3 },
     { href: "/notifications", title: "Центр уведомлений", badge: "notifications" },
@@ -81,6 +86,8 @@ export function Shell({ children }: { children: ReactNode }) {
   }
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  // Владелец без второго фактора (если он обязателен) может только настроить его
+  const needs2fa = Boolean(me.data.two_factor_required && !me.data.totp_enabled);
 
   return (
     <MeContext.Provider value={me.data}>
@@ -120,7 +127,16 @@ export function Shell({ children }: { children: ReactNode }) {
             </div>
             <button className="btn btn-sm" onClick={logout}>Выйти</button>
           </header>
-          <main className="content">{children}</main>
+          <main className="content">
+            {needs2fa ? (
+              <div className="notice warn">
+                <strong>Включите второй фактор входа</strong>
+                Для владельца он обязателен. Остальные разделы откроются после настройки приложения-аутентификатора.{" "}
+                {pathname !== "/settings" ? <Link href="/settings">Перейти к настройке</Link> : null}
+              </div>
+            ) : null}
+            {needs2fa && pathname !== "/settings" ? null : children}
+          </main>
         </div>
       </div>
       {toast ? (

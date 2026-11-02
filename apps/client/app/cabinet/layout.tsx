@@ -38,6 +38,7 @@ export default function CabinetLayout({ children }: { children: ReactNode }) {
             <div className="small muted">{me.data.phone}</div>
           </div>
           {link("/cabinet", "Мои договоры")}
+          {link("/cabinet/documents", "Документы")}
           {link("/cabinet/payment", "Как оплатить")}
           {link("/cabinet/support", "Обращения")}
           {link("/cabinet/notifications", "Уведомления", unread ? <span className="count">{unread}</span> : null)}

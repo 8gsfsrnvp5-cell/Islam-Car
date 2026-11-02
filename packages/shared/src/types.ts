@@ -204,3 +204,120 @@ export type AppNotification = {
   created_at: string;
   read: boolean;
 };
+
+// ---------- Версия 2 ----------
+
+export type DocCheck = { code: string; level: "ok" | "info" | "warning" | "error"; message: string };
+
+export type DocBlock =
+  | { type: "h1" | "h2" | "p" | "note"; text: string }
+  | { type: "table"; header: string[] | null; rows: string[][]; footer: string[] | null }
+  | { type: "signatures"; parties: { title: string; name: string }[] };
+
+export type TemplateParam = { name: string; label: string; required?: boolean; type?: "bool" };
+
+export type DocTemplate = {
+  code: string;
+  title: string;
+  version: string;
+  scope: "contract" | "client" | "car";
+  description: string;
+  requires: string[];
+  params: TemplateParam[];
+  requires_signed_contract: boolean;
+  visible_to_client: boolean;
+  lawyer_points: string[];
+  approved: boolean;
+  approval: { lawyer_name: string; approved_at: string; note: string } | null;
+};
+
+export type DocItem = {
+  id: string;
+  title: string;
+  template_code: string;
+  template_version: string;
+  template_approved: boolean;
+  status: "draft" | "pending_approval" | "approved" | "signed" | "cancelled";
+  contract_id: string | null;
+  client_id: string | null;
+  addendum_id: string | null;
+  visible_to_client: boolean;
+  created_at: string;
+  approved_at: string | null;
+  signed_on: string | null;
+  has_signed_file: boolean;
+  final: boolean;
+  watermark: string;
+  body_sha256: string;
+  cancelled_reason: string;
+  checks: DocCheck[];
+  blocks?: DocBlock[];
+  params?: Record<string, string | boolean>;
+};
+
+export type OutMessage = {
+  id: string;
+  client: string | null;
+  client_id: string;
+  contract_id: string | null;
+  contract_number: string | null;
+  channel: "internal" | "sms" | "email";
+  purpose: string;
+  body: string;
+  address_masked: string;
+  status: "scheduled" | "sent" | "failed" | "cancelled" | "skipped";
+  status_reason: string;
+  scheduled_for: string;
+  sent_at: string | null;
+  attempts: number;
+  provider: string;
+  created_at: string;
+};
+
+export type Pledge = {
+  id: string;
+  contract_id: string;
+  contract_number: string;
+  contract_status: string;
+  client: string;
+  car: string;
+  vin: string | null;
+  status: string;
+  registry_number: string;
+  registered_on: string | null;
+  notary: string;
+  release_number: string;
+  released_on: string | null;
+  notes: string;
+  updated_at: string;
+  allowed_next: string[];
+};
+
+export type InsurancePolicy = {
+  id: string;
+  car_id: string;
+  car: string;
+  vin: string | null;
+  contract_id: string | null;
+  kind: string;
+  number: string;
+  insurer: string;
+  valid_from: string;
+  valid_to: string;
+  required_by_contract: boolean;
+  notes: string;
+};
+
+export type StaffTask = {
+  id: string;
+  kind: string;
+  title: string;
+  description: string;
+  due_date: string | null;
+  status: "open" | "done" | "cancelled";
+  link: string;
+  created_at: string;
+  done_at: string | null;
+  result_note: string;
+  automatic: boolean;
+};

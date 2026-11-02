@@ -19,6 +19,8 @@ function todayIso() {
 export default function ContractPage() {
   const { id } = useParams<{ id: string }>();
   const { data: c, error, reload } = useClientApi<ClientContract>(`/api/client/contracts/${id}`, 30000);
+  const docs = useClientApi<{ id: string; title: string; contract_id: string; signed_on: string | null; final: boolean }[]>("/api/client/documents");
+  const changes = useClientApi<{ number: number; signed_on: string; term_months: number }[]>(`/api/client/contracts/${id}/schedule-changes`);
   const [report, setReport] = useState({ amount: "", paid_on: todayIso(), comment: "" });
   const [msg, setMsg] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -104,6 +106,26 @@ export default function ContractPage() {
           </table>
         </div>
       </div>
+
+      {changes.data?.length ? (
+        <div className="notice info">
+          {changes.data.map((ch) => (
+            <div key={ch.number}>График изменён дополнительным соглашением № {ch.number} от {formatDate(ch.signed_on)}. Цена договора не изменилась.</div>
+          ))}
+        </div>
+      ) : null}
+
+      {docs.data?.some((d) => d.contract_id === c.id) ? (
+        <div className="panel">
+          <h2>Документы по договору</h2>
+          {docs.data.filter((d) => d.contract_id === c.id).map((d) => (
+            <div className="list-item" key={d.id}>
+              <span>{d.title}{d.signed_on ? <span className="small muted"> · подписан {formatDate(d.signed_on)}</span> : null}</span>
+              <a className="btn btn-sm" href={`/api/client/documents/${d.id}/export?format=pdf`}>Скачать PDF</a>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       <div className="panel">
         <h2>История оплат</h2>

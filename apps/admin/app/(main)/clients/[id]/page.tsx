@@ -8,6 +8,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
+import { ClientCommunications } from "@/components/ClientCommunications";
 import { type ClientData, ClientForm } from "@/components/ClientForm";
 import { ConfirmButton } from "@/components/Confirm";
 import { useCan } from "@/components/Shell";
@@ -117,6 +118,7 @@ export default function ClientPage() {
           </Card>
         </div>
         <div>
+          <ClientCommunications clientId={c.id} />
           <Card title="Заявки" flush>
             {!c.applications.length ? <Empty>Нет связанных заявок</Empty> : (
               <table><tbody>
