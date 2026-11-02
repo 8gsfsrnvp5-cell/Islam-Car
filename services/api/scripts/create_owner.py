@@ -2,10 +2,14 @@
 
 Пароль запрашивается интерактивно и нигде не сохраняется в открытом виде:
     python -m scripts.create_owner --login owner@example.ru --name "Фамилия Имя"
+
+Для автоматизации (например, локального стенда) пароль можно передать через переменную окружения:
+    python -m scripts.create_owner --login ... --name ... --password-env OWNER_PASSWORD
 """
 
 import argparse
 import getpass
+import os
 import sys
 
 from sqlalchemy import select
@@ -19,14 +23,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Создать владельца Islamic Car")
     parser.add_argument("--login", required=True)
     parser.add_argument("--name", required=True)
+    parser.add_argument("--password-env", help="Имя переменной окружения с паролем (без интерактивного ввода)")
     args = parser.parse_args()
 
-    password = getpass.getpass("Пароль владельца: ")
+    if args.password_env:
+        password = os.environ.get(args.password_env, "")
+    else:
+        password = getpass.getpass("Пароль владельца: ")
+        if password != getpass.getpass("Повторите пароль: "):
+            print("Пароли не совпадают", file=sys.stderr)
+            return 1
     if len(password) < MIN_PASSWORD_LENGTH:
         print(f"Пароль должен быть не короче {MIN_PASSWORD_LENGTH} символов", file=sys.stderr)
-        return 1
-    if password != getpass.getpass("Повторите пароль: "):
-        print("Пароли не совпадают", file=sys.stderr)
         return 1
 
     with SessionLocal() as db:

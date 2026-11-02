@@ -64,7 +64,8 @@ def get_contract(db: Session, contract_id: uuid.UUID) -> Contract:
 
 def checks_dict(report) -> dict:
     return {"can_sign": report.can_sign, "items": [
-        {"code": c.code, "ok": c.ok, "message": c.message, "blocking": c.blocking} for c in report.checks]}
+        {"code": c.code, "ok": c.ok, "message": c.message, "blocking": c.blocking, "info": c.info}
+        for c in report.checks]}
 
 
 def contract_full(db: Session, c: Contract, actor: Actor) -> dict:

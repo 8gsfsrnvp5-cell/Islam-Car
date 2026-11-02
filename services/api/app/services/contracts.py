@@ -35,14 +35,15 @@ class Check:
     ok: bool
     message: str
     blocking: bool = True
+    info: bool = False  # пояснение о правовом режиме, а не проверка
 
 
 @dataclass
 class CheckReport:
     checks: list[Check] = field(default_factory=list)
 
-    def add(self, code: str, ok: bool, message: str, blocking: bool = True) -> None:
-        self.checks.append(Check(code, ok, message, blocking))
+    def add(self, code: str, ok: bool, message: str, blocking: bool = True, info: bool = False) -> None:
+        self.checks.append(Check(code, ok, message, blocking, info))
 
     @property
     def can_sign(self) -> bool:
@@ -135,11 +136,11 @@ def run_checks(db: Session, c: Contract) -> CheckReport:
     if c.is_consumer_deal:
         r.add("consumer_regime", True,
               "Потребительская сделка: применяются требования Закона о защите прав потребителей. "
-              "Текст договора должен быть утверждён юристом.", blocking=False)
+              "Текст договора должен быть утверждён юристом.", blocking=False, info=True)
     if c.seller_regime == SellerRegime.individual_one_off:
         r.add("seller_regime", True,
               "Режим «разовая продажа личного имущества». Регулярные продажи в этом режиме недопустимы — "
-              "при систематической деятельности нужна регистрация ИП/ООО.", blocking=False)
+              "при систематической деятельности нужна регистрация ИП/ООО.", blocking=False, info=True)
     r.add("no_interest", c.no_interest_on_delay,
           "Проценты и штрафы за просрочку не начисляются" if c.no_interest_on_delay
           else "Договор допускает начисления за просрочку — недопустимо для модели")
