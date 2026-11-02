@@ -42,13 +42,13 @@ const NAV: { group: string; items: NavItem[] }[] = [
     { href: "/documents", title: "Документы и шаблоны" },
     { href: "/collateral", title: "Залоги и страхование" },
     { href: "/finance", title: "Финансы" },
-    { href: "/accounting", title: "Бухгалтерия и налоги", soon: 3 },
+    { href: "/accounting", title: "Бухгалтерия и налоги" },
     { href: "/notifications", title: "Центр уведомлений", badge: "notifications" },
     { href: "/reports", title: "Отчёты" },
   ] },
   { group: "Знания и ИИ", items: [
-    { href: "/knowledge", title: "Библиотеки знаний", soon: 3 },
-    { href: "/agents", title: "Центр ИИ-агентов", soon: 3 },
+    { href: "/knowledge", title: "Библиотеки знаний" },
+    { href: "/agents", title: "Центр ИИ-агентов" },
   ] },
   { group: "Система", items: [{ href: "/settings", title: "Пользователи и настройки" }] },
 ];

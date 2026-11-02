@@ -32,6 +32,7 @@ export type StaffCar = Omit<PublicCar, "vin_tail"> & {
   purchase_price_kopecks?: number | null;
   purchase_date: string | null;
   purchase_document: string;
+  purchased_from: string;
   created_at: string;
   updated_at: string;
 };
@@ -207,7 +208,10 @@ export type AppNotification = {
 
 // ---------- Версия 2 ----------
 
-export type DocCheck = { code: string; level: "ok" | "info" | "warning" | "error"; message: string };
+export type DocCheck = {
+  code: string; level: "ok" | "info" | "warning" | "error"; message: string;
+  legal?: { code: string; title: string; act: string; article: string; source: string; reliable: boolean; problems: string[] }[];
+};
 
 export type DocBlock =
   | { type: "h1" | "h2" | "p" | "note"; text: string }

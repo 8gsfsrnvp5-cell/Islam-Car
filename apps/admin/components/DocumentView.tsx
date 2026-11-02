@@ -60,7 +60,22 @@ export function DocChecks({ checks }: { checks: DocCheck[] }) {
   return (
     <ul className="checks">
       {checks.map((c, i) => (
-        <li key={i}><span className={`mark ${TONE[c.level]}`}>{ICON[c.level]}</span><span className="small">{c.message}</span></li>
+        <li key={i}>
+          <span className={`mark ${TONE[c.level]}`}>{ICON[c.level]}</span>
+          <span className="small">
+            {c.message}
+            {c.legal?.length ? (
+              <ul style={{ margin: "6px 0 0", paddingLeft: 16 }}>
+                {c.legal.map((l) => (
+                  <li key={l.code}>
+                    {l.reliable ? "✓" : "!"} {l.title} — {l.source}
+                    {!l.reliable ? <span className="muted"> ({l.problems.slice(0, 2).join("; ")})</span> : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </span>
+        </li>
       ))}
     </ul>
   );
