@@ -66,6 +66,9 @@ def record_history(code: str, actor: Actor = Depends(require("knowledge.read")),
 def review(code: str, data: ReviewIn, actor: Actor = Depends(require("knowledge.review")),
            db: Session = Depends(get_db)):
     """Фиксирует заключение специалиста. Система сама норму не утверждает."""
+    rec = next((r for r in load_records() if r.code == code), None)
+    if rec and not actor.can(f"knowledge.review.{rec.library}"):
+        raise HTTPException(403, "Заключение по этой библиотеке фиксирует профильный специалист")
     try:
         r = record_review(db, code, data.version, data.status, data.reviewer_name, data.reviewer_role, data.note,
                           actor.user.id)

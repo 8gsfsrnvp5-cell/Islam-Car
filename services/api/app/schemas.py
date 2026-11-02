@@ -221,6 +221,12 @@ class ReverseIn(StrictModel):
     reason: str = Field(min_length=5, max_length=2000)
 
 
+class BankConfirmIn(StrictModel):
+    contract_id: UUID
+    note: str = Field(default="", max_length=2000)
+    report_id: UUID | None = None
+
+
 class ReportReviewIn(StrictModel):
     note: str = Field(min_length=2, max_length=2000)
 

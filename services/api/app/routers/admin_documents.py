@@ -31,6 +31,7 @@ from app.security import Actor, require
 from app.services import audit
 from app.services.addenda import apply_addendum, create_addendum, plan_schedule
 from app.services.common import today
+from app.services.document_audit import audit_documents
 from app.services.notify import notify_client, notify_staff
 
 router = APIRouter(prefix="/api/admin", tags=["admin: documents"])
@@ -80,7 +81,7 @@ def list_templates(actor: Actor = Depends(require("contracts.read")), db: Sessio
 
 
 @router.post("/templates/{code}/approve")
-def approve_template(code: str, data: TemplateApproveIn, actor: Actor = Depends(require("settings.write")),
+def approve_template(code: str, data: TemplateApproveIn, actor: Actor = Depends(require("templates.approve")),
                      db: Session = Depends(get_db)):
     """Фиксирует утверждение шаблона юристом. Шаблон со спорными пометками утвердить нельзя."""
     tpl = registry.get_template(code)
@@ -99,7 +100,8 @@ def approve_template(code: str, data: TemplateApproveIn, actor: Actor = Depends(
 
 
 @router.post("/templates/{code}/revoke")
-def revoke_template(code: str, actor: Actor = Depends(require("settings.write")), db: Session = Depends(get_db)):
+def revoke_template(code: str, actor: Actor = Depends(require("templates.approve")),
+                    db: Session = Depends(get_db)):
     tpl = registry.get_template(code)
     approval = registry.active_approval(db, tpl) if tpl else None
     if not approval:
@@ -141,6 +143,13 @@ def _sources(db: Session, data: DocumentIn, tpl: registry.Template):
     if tpl.code == "schedule_addendum" and addendum is None:
         raise HTTPException(422, "Документ формируется из дополнительного соглашения")
     return contract, client, car, addendum
+
+
+@router.get("/document-audit")
+def document_audit(contract_id: uuid.UUID | None = None, actor: Actor = Depends(require("documents.audit")),
+                   db: Session = Depends(get_db)):
+    """Проверка актуальности, комплектности и целостности документов. Ничего не меняет."""
+    return audit_documents(db, today(), contract_id)
 
 
 @router.get("/documents")

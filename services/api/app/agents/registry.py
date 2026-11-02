@@ -1,4 +1,4 @@
-"""Специализированные агенты версии 3."""
+"""Специализированные агенты (версии 3 и 4)."""
 
 from datetime import UTC, datetime, timedelta
 
@@ -13,6 +13,7 @@ from app.models import (
     Application,
     ApplicationKind,
     ApplicationStatus,
+    BankTransaction,
     Car,
     CarStatus,
     Channel,
@@ -22,6 +23,7 @@ from app.models import (
     OutboundMessage,
     OwnershipStatus,
     Payment,
+    PaymentIntent,
     PaymentReport,
     PaymentReportStatus,
     PaymentStatus,
@@ -34,6 +36,7 @@ from app.services import car_checks
 from app.services.accounting import PARAMS, calculate
 from app.services.contracts import get_company
 from app.services.dashboard import live_ledgers
+from app.services.document_audit import audit_documents
 from app.services.messaging import address_for, has_consent
 from app.services.notify import rub
 
@@ -75,6 +78,21 @@ class PaymentsAgent(Agent):
             Payment.status == PaymentStatus.reversed, Payment.reversed_at >= ctx.now - timedelta(days=7))) or 0
         if reversed_count:
             out.append(Finding("info", f"Сторнировано платежей за неделю: {reversed_count}", link="/payments"))
+        waiting = db.scalar(select(func.count()).select_from(BankTransaction).where(
+            BankTransaction.status.in_(("new", "suggested")),
+            BankTransaction.received_on <= ctx.today - timedelta(days=2))) or 0
+        if waiting:
+            out.append(Finding("warning", f"Поступления из выписок без решения больше 2 дней: {waiting}",
+                               "Пока сотрудник не подтвердил поступление, долг покупателя не уменьшается.", "/bank",
+                               suggestion="Отнести поступления к договорам или отметить как не относящиеся"))
+            ctx.create_task("bank_review", f"Разобрать поступления из выписок: {waiting}",
+                            "Подтвердить договор по каждому поступлению или указать причину", "/bank",
+                            f"bank_review:{ctx.today}", due=ctx.today)
+        review = db.scalar(select(func.count()).select_from(PaymentIntent).where(
+            PaymentIntent.status == "needs_review")) or 0
+        if review:
+            out.append(Finding("critical", f"Онлайн-оплаты требуют проверки: {review}",
+                               "Деньги получены платёжным сервисом, но автоматически не учтены.", "/payments"))
         return out
 
 
@@ -321,6 +339,33 @@ class ManagementAgent(Agent):
         return [Finding(severity, f"Сводка на {ctx.today:%d.%m.%Y}", body, "/agents")]
 
 
+class DocumentsAgent(Agent):
+    code = "documents"
+    title = "Агент документов"
+    description = "Актуальность проектов, комплектность по договорам, целостность подписанных документов и сканов"
+    permissions = ["create:tasks"]
+    reads = ["документы", "договоры", "шаблоны", "сканы подписанных экземпляров"]
+
+    def run(self, db: Session, ctx: AgentContext) -> list[Finding]:
+        report = audit_documents(db, ctx.today)
+        out: list[Finding] = []
+        for issue in report["issues"]:
+            link = (f"/documents/{issue['document_id']}" if issue["document_id"]
+                    else f"/contracts/{issue['contract_id']}" if issue["contract_id"] else "/documents")
+            if issue["severity"] == "info":
+                continue
+            out.append(Finding(issue["severity"], issue["title"], issue["message"], link, suggestion=issue["action"]))
+            if issue["severity"] == "critical":
+                ctx.create_task("document", issue["title"], f"{issue['message']} {issue['action']}", link,
+                                f"document:{issue['code']}:{issue['document_id'] or issue['contract_id']}",
+                                due=ctx.today)
+        info = report["counts"]["info"]
+        if info:
+            out.append(Finding("info", f"Замечаний для сведения: {info}", "Например, не загружены сканы.",
+                               "/documents"))
+        return out
+
+
 AGENTS: dict[str, Agent] = {a.code: a for a in (
-    PaymentsAgent(), NotificationsAgent(), LegalAgent(), AccountingAgent(), FinanceAgent(), CarsAgent(),
-    ApplicationsAgent(), ManagementAgent())}
+    PaymentsAgent(), NotificationsAgent(), LegalAgent(), DocumentsAgent(), AccountingAgent(), FinanceAgent(),
+    CarsAgent(), ApplicationsAgent(), ManagementAgent())}

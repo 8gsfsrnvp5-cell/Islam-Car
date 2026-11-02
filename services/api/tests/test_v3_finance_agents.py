@@ -150,7 +150,7 @@ def test_agents_produce_findings_with_sources_and_tasks(admin):
     assert any(n["title"].startswith("Сводка на") for n in admin.get("/api/admin/notifications").json())
 
     listing = admin.get("/api/admin/agents").json()
-    assert len(listing["agents"]) == 8 and listing["mode"].startswith("Проверяемые правила")
+    assert len(listing["agents"]) == 9 and listing["mode"].startswith("Проверяемые правила")
 
 
 def test_worker_runs_all_agents_daily():
@@ -158,4 +158,4 @@ def test_worker_runs_all_agents_daily():
     run_once(now)
     with SessionLocal() as db:
         codes = {r.agent_code for r in db.scalars(select(AgentRun))}
-    assert len(codes) == 8
+    assert len(codes) == 9  # версия 4 добавила агента документов

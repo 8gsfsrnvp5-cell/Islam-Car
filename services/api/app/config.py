@@ -49,6 +49,25 @@ class Settings(BaseSettings):
     smtp_password: str = ""
     smtp_from: str = ""
     smtp_starttls: bool = True
+    # SMS.ru: нужен договор с оператором и согласованное имя отправителя. test=1 — сообщение не отправляется
+    smsru_api_id: str = ""
+    smsru_from: str = ""
+    smsru_test: bool = False
+
+    # Онлайн-оплата. "sandbox" — тестовая оплата без денег (запрещена в production), "yookassa" — ЮKassa
+    payment_provider: str = ""
+    yookassa_shop_id: str = ""
+    yookassa_secret_key: str = ""
+    yookassa_api_url: str = "https://api.yookassa.ru/v3"
+    # Чеки по 54-ФЗ настраивает бухгалтер. Пока владелец не подтвердил, онлайн-оплата в production выключена
+    payment_receipts_confirmed: bool = False
+    # Адрес кабинета покупателя, куда платёжный сервис возвращает после оплаты
+    client_public_url: str = "http://localhost:3000"
+
+    # Помощник по библиотекам знаний (Claude API). Без ключа выключен; включает владелец в настройках
+    anthropic_api_key: str = ""
+    assistant_model: str = "claude-opus-5-5"
+    assistant_timeout_seconds: float = 60.0
 
     # Фоновый обработчик
     worker_poll_seconds: float = 5.0
