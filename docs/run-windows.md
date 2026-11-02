@@ -23,6 +23,7 @@ docker compose exec api python -m scripts.create_owner --login owner@example.ru 
 
 - Админка: http://localhost:3001
 - Сайт: http://localhost:3000
+- Фоновый обработчик (напоминания, задачи, резервные копии) запускается сервисом `worker` автоматически.
 - Документация API: http://localhost:8000/api/docs (отключается при `ENVIRONMENT=production`)
 
 Остановка — `docker compose down`. Данные базы и фото сохраняются в томах `pgdata` и `storage`
@@ -55,6 +56,17 @@ alembic upgrade head
 python -m scripts.create_owner --login owner@example.ru --name "Фамилия Имя"
 uvicorn app.main:app --port 8000
 ```
+
+Фоновый обработчик — в отдельном окне PowerShell из той же папки:
+
+```powershell
+cd services\api
+.\.venv\Scripts\Activate.ps1
+python -m app.worker
+```
+
+Без обработчика сайт и админка работают, но напоминания, контроль сроков и резервные копии не выполняются —
+это видно в «Центре уведомлений» → «Фоновый обработчик».
 
 Если PowerShell запрещает запуск `Activate.ps1`, выполните один раз:
 `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
@@ -105,6 +117,25 @@ npm run typecheck
 4. Из заявки создайте клиента → заполните реквизиты → «Подтвердить личность» → «Подготовить договор».
 5. После подписания на бумаге зафиксируйте подписание в карточке договора и выдайте клиенту доступ в кабинет.
 6. Поступления подтверждайте в карточке договора по банковской выписке.
+
+### Каналы уведомлений и резервные копии без Docker
+
+В `services/api/.env`:
+
+```
+# тестовый режим: сообщения пишутся в журнал, наружу не уходят (запрещён при ENVIRONMENT=production)
+SMS_PROVIDER=log
+EMAIL_PROVIDER=log
+# или реальная почта
+# EMAIL_PROVIDER=smtp
+# SMTP_HOST=smtp.example.ru
+# SMTP_FROM=noreply@example.ru
+BACKUP_DIR=D:/IslamicCar/backups
+PG_DUMP_PATH="C:/Program Files/PostgreSQL/17/bin/pg_dump.exe"
+PG_RESTORE_PATH="C:/Program Files/PostgreSQL/17/bin/pg_restore.exe"
+```
+
+Версия `pg_dump` должна быть не ниже версии сервера PostgreSQL.
 
 Демо-карточки автомобилей для локальной разработки: `python -m scripts.seed_demo`
 (работает только при `ENVIRONMENT=development`, карточки помечены «ДЕМО»).
