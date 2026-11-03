@@ -1,23 +1,31 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.models import Car, CarPhoto, CarStatus, OwnershipStatus
-from app.schemas import CarIn, CarPatch
+from app.models import AuditLog, Car, CarPhoto, CarStatus, OwnershipStatus
+from app.schemas import CarIn, CarPatch, StrictModel
 from app.security import Actor, require
 from app.serializers import car_staff
-from app.services import audit
+from app.services import audit, car_recognition
 from app.services.common import normalize_vin
-from app.services.files import photo_path, save_photo
+from app.services.files import photo_path, read_photo, save_photo
 
 router = APIRouter(prefix="/api/admin/cars", tags=["admin: cars"])
 
 MAX_PHOTOS = 20
+MAX_RECOGNITIONS_PER_HOUR = 60
+
+
+class RecognitionSettingsIn(StrictModel):
+    enabled: bool
+    confirm_data_scope: bool = False
 
 
 def get_car(db: Session, car_id: uuid.UUID) -> Car:
@@ -46,6 +54,52 @@ def check_publishable(car: Car) -> None:
         problems.append("не указан VIN")
     if problems:
         raise HTTPException(422, "Нельзя опубликовать: " + "; ".join(problems))
+
+
+def recognition_dict(db: Session, actor: Actor) -> dict:
+    st = car_recognition.status(db)
+    return {"enabled": st.enabled, "configured": st.configured, "model": st.model, "reason": st.reason,
+            "changed_at": st.changed_at, "can_manage": actor.can("settings.write"),
+            "data_scope": car_recognition.DATA_SCOPE, "disclaimer": car_recognition.DISCLAIMER}
+
+
+# Маршруты распознавания объявлены до /{car_id}, чтобы «recognition» не принималось за идентификатор
+@router.get("/recognition")
+def recognition_status(actor: Actor = Depends(require("cars.read")), db: Session = Depends(get_db)):
+    return recognition_dict(db, actor)
+
+
+@router.put("/recognition/settings")
+def recognition_settings(data: RecognitionSettingsIn, actor: Actor = Depends(require("settings.write")),
+                         db: Session = Depends(get_db)):
+    """Включает распознавание по фото. Включение — только с подтверждением состава передаваемых данных."""
+    if data.enabled and not data.confirm_data_scope:
+        raise HTTPException(422, "Подтвердите, какие данные передаются во внешний сервис")
+    car_recognition.set_enabled(db, data.enabled, str(actor.user.id))
+    audit.record(db, actor, "car_recognition.enabled" if data.enabled else "car_recognition.disabled", "settings", 1,
+                 data_scope=car_recognition.DATA_SCOPE if data.enabled else None)
+    db.commit()
+    return recognition_dict(db, actor)
+
+
+@router.post("/recognize")
+async def recognize(file: UploadFile = File(...), actor: Actor = Depends(require("cars.write")),
+                    db: Session = Depends(get_db)):
+    """Подсказка для карточки по фото. Ничего не сохраняет: поля проверяет и сохраняет сотрудник."""
+    hour_ago = datetime.now(UTC) - timedelta(hours=1)
+    recent = db.scalar(select(func.count(AuditLog.id)).where(
+        AuditLog.actor_user_id == actor.user.id, AuditLog.action == "car.recognized",
+        AuditLog.created_at >= hour_ago)) or 0
+    if recent >= MAX_RECOGNITIONS_PER_HOUR:
+        raise HTTPException(429, "Слишком много распознаваний за час — попробуйте позже")
+    content = await read_photo(file)
+    # Запрос к Claude идёт несколько секунд — в отдельном потоке, чтобы не задерживать другие запросы
+    result = await run_in_threadpool(car_recognition.recognize, db, content)
+    # В журнал — только вывод, без фотографии
+    audit.record(db, actor, "car.recognized", "car", None, make=result["fields"].get("make"),
+                 model=result["fields"].get("model"), confidence=result["confidence"])
+    db.commit()
+    return result
 
 
 @router.get("")
@@ -155,6 +209,22 @@ async def upload_photo(car_id: uuid.UUID, file: UploadFile = File(...), actor: A
     audit.record(db, actor, "car.photo_added", "car", car.id)
     db.commit()
     db.refresh(car)
+    return car_staff(car, actor)
+
+
+@router.post("/{car_id}/photos/{photo_id}/main")
+def make_main_photo(car_id: uuid.UUID, photo_id: uuid.UUID, actor: Actor = Depends(require("cars.write")),
+                    db: Session = Depends(get_db)):
+    """Главное фото показывается первым в каталоге и в списке автомобилей."""
+    car = get_car(db, car_id)
+    photo = next((p for p in car.photos if p.id == photo_id), None)
+    if not photo:
+        raise HTTPException(404, "Фото не найдено")
+    for position, p in enumerate([photo, *(p for p in car.photos if p.id != photo_id)]):
+        p.position = position
+    audit.record(db, actor, "car.photo_main", "car", car.id)
+    db.commit()
+    db.refresh(car, ["photos"])  # перечитываем список в новом порядке
     return car_staff(car, actor)
 
 

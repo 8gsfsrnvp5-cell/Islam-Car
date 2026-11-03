@@ -51,8 +51,9 @@ def update_settings(data: AssistantSettingsIn, actor: Actor = Depends(require("s
     if data.enabled and not data.confirm_data_scope:
         raise HTTPException(422, "Подтвердите, какие данные передаются во внешний сервис")
     co = get_company(db)
-    co.assistant_policy = {"enabled": data.enabled, "changed_at": datetime.now(UTC).isoformat(),
-                           "changed_by": str(actor.user.id)}
+    # Прочие ключи политики (например, распознавание фото автомобилей) сохраняются
+    co.assistant_policy = {**(co.assistant_policy or {}), "enabled": data.enabled,
+                           "changed_at": datetime.now(UTC).isoformat(), "changed_by": str(actor.user.id)}
     audit.record(db, actor, "assistant.enabled" if data.enabled else "assistant.disabled", "settings", 1,
                  data_scope=CONFIRMATION if data.enabled else None)
     db.commit()
