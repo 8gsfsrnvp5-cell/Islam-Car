@@ -62,9 +62,8 @@ export function PhotoPicker({ onFiles, disabled }: { onFiles: (files: File[]) =>
 export function RecognitionOff({ status }: { status: RecognitionStatus }) {
   return (
     <Notice tone="info">
-      Распознавание по фото выключено: {status.reason.toLowerCase()}.{" "}
-      {status.can_manage && status.configured ? <Link href="/settings">Включить в настройках</Link>
-        : !status.configured ? "Для него нужен ключ Claude API на сервере." : "Включает владелец."}{" "}
+      Распознавание по фото выключено: {status.reason.charAt(0).toLowerCase() + status.reason.slice(1)}.{" "}
+      {status.configured ? (status.can_manage ? <><Link href="/settings">Включить в настройках</Link>. </> : "Включает владелец. ") : null}
       Фотографии загружаются и без него.
     </Notice>
   );

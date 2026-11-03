@@ -264,6 +264,6 @@ mark.lawyer { background: #fff1c2; border-bottom: 2px solid #e2a400; padding: 0 
   .topbar form, .topbar .user { display: none; }
   .content { padding: 14px 12px 40px; }
   .form-grid, .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
-  .photos figure, .photos img { width: calc(50vw - 30px); }
-  .photos img { height: calc((50vw - 30px) * .7); }
+  .photos figure { width: calc(50% - 5px); }
+  .photos img { width: 100%; height: auto; aspect-ratio: 16 / 11; }
 }

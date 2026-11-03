@@ -50,7 +50,10 @@ export function CarForm({ car, canCost, busy, onSubmit, submitLabel, prefill, hi
   const [v, setV] = useState<Values>(() => initial(car));
   const [error, setError] = useState<string | null>(null);
   const [aiFields, setAiFields] = useState<Set<string>>(new Set());
+  // Значения, которые подставил ИИ: поле с таким значением можно обновить новым распознаванием
   const aiValues = useRef<Values>({});
+  const current = useRef(v);
+  current.current = v;
   const sold = car?.status === "sold";
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setV((prev) => ({ ...prev, [k]: e.target.value }));
@@ -59,17 +62,17 @@ export function CarForm({ car, canCost, busy, onSubmit, submitLabel, prefill, hi
 
   useEffect(() => {
     if (!prefill) return;
-    const applied: string[] = [];
-    setV((prev) => {
-      const next = { ...prev };
-      for (const [k, value] of Object.entries(prefill.values)) {
-        if (!value || !(k in next) || (k === "vin" && sold)) continue;
-        if (next[k] === "" || next[k] === aiValues.current[k]) { next[k] = value; applied.push(k); }
-      }
-      return next;
-    });
-    aiValues.current = { ...aiValues.current, ...prefill.values };
-    setAiFields((prev) => new Set([...prev, ...applied]));
+    const cur = current.current;
+    const applied: Values = {};
+    for (const [k, value] of Object.entries(prefill.values)) {
+      if (!value || !(k in cur) || (k === "vin" && sold)) continue;
+      if (cur[k] === "" || (k in aiValues.current && cur[k] === aiValues.current[k])) applied[k] = value;
+    }
+    const keys = Object.keys(applied);
+    if (!keys.length) return;
+    aiValues.current = { ...aiValues.current, ...applied };
+    setV((prev) => ({ ...prev, ...applied }));
+    setAiFields((prev) => new Set([...prev, ...keys]));
   }, [prefill, sold]);
 
   const ai = (k: string, title: string) => (aiFields.has(k) ? <>{title} <span className="ai-tag">ИИ · проверьте</span></> : title);
