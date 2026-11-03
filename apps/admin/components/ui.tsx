@@ -75,7 +75,7 @@ export function Money({ k, strong }: { k: number | null | undefined; strong?: bo
   return strong ? <strong>{formatRub(k)}</strong> : <>{formatRub(k)}</>;
 }
 
-export function Field({ label, hint, children, wide }: { label: string; hint?: ReactNode; children: ReactNode; wide?: boolean }) {
+export function Field({ label, hint, children, wide }: { label: ReactNode; hint?: ReactNode; children: ReactNode; wide?: boolean }) {
   return (
     <label className={`field ${wide ? "wide" : ""}`}>
       <span>{label}</span>

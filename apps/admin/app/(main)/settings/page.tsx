@@ -70,6 +70,38 @@ function AssistantCard() {
   );
 }
 
+type RecognitionSettings = { enabled: boolean; configured: boolean; model: string; reason: string; changed_at: string | null; data_scope: string };
+
+function RecognitionCard() {
+  const { data, error, setData } = useApi<RecognitionSettings>("/api/admin/cars/recognition");
+  const [confirm, setConfirm] = useState(false);
+  const action = useAction();
+  if (!data) return error ? <ErrorBox error={error} /> : null;
+  const save = async (enabled: boolean) => {
+    const r = await action.run(() => api<RecognitionSettings>("/api/admin/cars/recognition/settings",
+      { method: "PUT", json: { enabled, confirm_data_scope: confirm } }));
+    if (r) { setData(r); setConfirm(false); }
+  };
+  return (
+    <Card title="Распознавание автомобиля по фото (Claude API)" subtitle="Подставляет марку, модель, кузов и цвет в карточку. По умолчанию выключено">
+      <p className="small">{data.data_scope}</p>
+      <p className="small">Состояние: {data.enabled ? <Badge tone="ok">включено · {data.model}</Badge> : <Badge>выключено</Badge>}
+        {data.reason ? <span className="muted"> — {data.reason}</span> : null}
+        {data.changed_at ? <span className="muted"> · изменено {formatDateTime(data.changed_at)}</span> : null}</p>
+      <ErrorBox error={action.error} />
+      {data.enabled ? (
+        <button className="btn btn-sm" onClick={() => save(false)} disabled={action.busy}>Выключить</button>
+      ) : data.configured ? (
+        <div className="actions">
+          <label className="small"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />{" "}
+            Подтверждаю состав передаваемых данных</label>
+          <button className="btn btn-sm btn-primary" onClick={() => save(true)} disabled={action.busy || !confirm}>Включить</button>
+        </div>
+      ) : <Notice tone="info">Чтобы включить распознавание, администратор сервера задаёт ANTHROPIC_API_KEY в переменных окружения. Каждое распознавание — платный запрос к Claude API.</Notice>}
+    </Card>
+  );
+}
+
 function CompanyCard() {
   const canWrite = useCan("settings.write");
   const { data, error, setData } = useApi<Company>("/api/admin/settings");
@@ -293,6 +325,7 @@ export default function SettingsPage() {
           {canUsers ? <UsersCard /> : null}
           {canUsers ? <BackupsCard /> : null}
           {canUsers ? <AssistantCard /> : null}
+          {canUsers ? <RecognitionCard /> : null}
           {canAudit ? <AuditCard /> : null}
         </div>
         <AccountCard />

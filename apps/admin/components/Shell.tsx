@@ -66,6 +66,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<string | null>(null);
   const lastSeen = useRef<string | null | undefined>(undefined);
   const [query, setQuery] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // На телефоне меню закрывается после перехода в раздел
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   // Всплывающее сообщение, когда приходит новое уведомление (например, новая заявка)
   useEffect(() => {
@@ -95,7 +99,9 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <MeContext.Provider value={me.data}>
       <div className="layout">
-        <aside className="side">
+        <button type="button" className={`side-backdrop ${menuOpen ? "open" : ""}`} aria-label="Закрыть меню"
+                onClick={() => setMenuOpen(false)} />
+        <aside className={`side ${menuOpen ? "open" : ""}`}>
           <div className="brand">
             <div className="brand-mark">IC</div>
             <div>Islamic Car<small>Администрирование</small></div>
@@ -117,6 +123,9 @@ export function Shell({ children }: { children: ReactNode }) {
         </aside>
         <div className="main">
           <header className="topbar">
+            <button type="button" className="btn btn-sm menu-btn" onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen}>
+              Меню
+            </button>
             <form onSubmit={(e) => { e.preventDefault(); if (query.trim()) router.push(`/search?q=${encodeURIComponent(query.trim())}`); }}>
               <input type="search" placeholder="Поиск: ФИО, телефон, VIN, номер договора, автомобиль" value={query}
                      onChange={(e) => setQuery(e.target.value)} aria-label="Глобальный поиск" />

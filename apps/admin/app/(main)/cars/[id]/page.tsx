@@ -1,12 +1,15 @@
 "use client";
 
-import { AVAILABILITY, CAR_STATUS, OWNERSHIP, type StaffCar, api, formatDateTime, formatRub } from "@islamic-car/shared";
+import { AVAILABILITY, CAR_STATUS, OWNERSHIP, type StaffCar, api, errorText, formatDateTime, formatRub } from "@islamic-car/shared";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { CarChecklist } from "@/components/CarChecklist";
-import { CarForm } from "@/components/CarForm";
+import {
+  PhotoPicker, type Recognition, RecognitionOff, RecognitionResult, recognizePhoto, useRecognition, yearHint,
+} from "@/components/CarPhotoTools";
+import { CarForm, type Prefill } from "@/components/CarForm";
 import { useCan } from "@/components/Shell";
 import { Badge, Card, ErrorBox, Loading, Notice, PageHead, StatusBadge } from "@/components/ui";
 import { CLIENT_SITE_URL, useAction, useApi } from "@/lib/useApi";
@@ -19,13 +22,28 @@ export default function CarPage() {
   const action = useAction();
   const [saved, setSaved] = useState(false);
   const [formKey, setFormKey] = useState(0);
+  const recognition = useRecognition();
+  const [result, setResult] = useState<Recognition | null>(null);
+  const [recognizing, setRecognizing] = useState<string | null>(null);
+  const [recError, setRecError] = useState<string | null>(null);
+  const [prefill, setPrefill] = useState<Prefill | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [created, setCreated] = useState<{ problems: string[] } | null>(null);
+
+  // Итог создания карточки со страницы «Новый автомобиль»; адрес очищаем, чтобы сообщение не повторялось
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (!q.get("created")) return;
+    setCreated({ problems: (q.get("problems") ?? "").split("\n").filter(Boolean) });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, []);
 
   if (!car) return error ? <ErrorBox error={error} /> : <Loading />;
 
   async function save(payload: Record<string, unknown>) {
     setSaved(false);
     const updated = await action.run(() => api<StaffCar>(`/api/admin/cars/${id}`, { method: "PATCH", json: payload }));
-    if (updated) { setData(updated); setSaved(true); setFormKey((k) => k + 1); }
+    if (updated) { setData(updated); setSaved(true); setPrefill(null); setFormKey((k) => k + 1); }
   }
 
   async function togglePublish() {
@@ -34,20 +52,38 @@ export default function CarPage() {
     if (updated) setData(updated);
   }
 
-  async function upload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    for (const file of files) {
+  async function upload(files: File[]) {
+    for (const [i, file] of files.entries()) {
+      setUploading(`Загружаем фото ${i + 1} из ${files.length}…`);
       const body = new FormData();
       body.append("file", file);
       const updated = await action.run(() => api<StaffCar>(`/api/admin/cars/${id}/photos`, { method: "POST", body }));
       if (updated) setData(updated);
     }
-    e.target.value = "";
+    setUploading(null);
   }
 
   async function removePhoto(photoId: string) {
     const updated = await action.run(() => api<StaffCar>(`/api/admin/cars/${id}/photos/${photoId}`, { method: "DELETE" }));
     if (updated) setData(updated);
+  }
+
+  async function makeMain(photoId: string) {
+    const updated = await action.run(() => api<StaffCar>(`/api/admin/cars/${id}/photos/${photoId}/main`, { method: "POST" }));
+    if (updated) setData(updated);
+  }
+
+  async function recognize(photo: { id: string; url: string }) {
+    setRecognizing(photo.id);
+    setRecError(null);
+    try {
+      const blob = await (await fetch(photo.url, { credentials: "same-origin" })).blob();
+      setResult(await recognizePhoto(blob));
+    } catch (e) {
+      setRecError(errorText(e));
+    } finally {
+      setRecognizing(null);
+    }
   }
 
   const availability = car.status === "reserved" ? "reserved" : car.ownership_status === "owned" ? "in_stock" : "purchasing";
@@ -69,11 +105,19 @@ export default function CarPage() {
           </>
         }
       />
+      {created ? (
+        created.problems.length ? (
+          <Notice tone="warn" title="Карточка создана, но не всё получилось">
+            {created.problems.map((p) => <div key={p}>{p}</div>)}
+          </Notice>
+        ) : <Notice tone="ok">Карточка создана{car.is_published ? " и опубликована в каталоге" : ""}</Notice>
+      ) : null}
       <ErrorBox error={action.error} />
       {saved ? <Notice tone="ok">Изменения сохранены</Notice> : null}
       <div className="split">
         <Card title="Карточка">
-          {canWrite ? <CarForm key={formKey} car={car} canCost={canCost} busy={action.busy} onSubmit={save} submitLabel="Сохранить изменения" />
+          {canWrite ? <CarForm key={formKey} car={car} canCost={canCost} busy={action.busy} onSubmit={save} submitLabel="Сохранить изменения"
+                               prefill={prefill} hints={{ year: yearHint(result) }} />
             : <p className="muted">Недостаточно прав для изменения карточки.</p>}
         </Card>
         <div>
@@ -90,16 +134,34 @@ export default function CarPage() {
             ) : null}
           </Card>
           <CarChecklist carId={car.id} />
-          <Card title="Фотографии" subtitle="JPEG, PNG или WebP до 10 МБ">
-            <div className="photos">
-              {car.photos.map((p) => (
+          <Card title="Фотографии" subtitle="JPEG, PNG или WebP до 10 МБ. Первое фото — главное в каталоге. Место съёмки и модель телефона из снимков удаляются">
+            {canWrite ? <PhotoPicker onFiles={upload} disabled={action.busy || Boolean(uploading)} /> : null}
+            {uploading ? <Notice tone="info">{uploading}</Notice> : null}
+            <div className="photos" style={{ marginTop: 12 }}>
+              {car.photos.map((p, i) => (
                 <figure key={p.id}>
                   <img src={p.url} alt="" />
-                  {canWrite ? <button className="btn btn-sm btn-danger" onClick={() => removePhoto(p.id)}>Удалить</button> : null}
+                  {i === 0 ? <figcaption>Главное</figcaption> : null}
+                  {canWrite ? (
+                    <div className="actions">
+                      {i > 0 ? <button className="btn btn-sm" onClick={() => makeMain(p.id)} disabled={action.busy}>Главное</button> : null}
+                      {recognition.data?.enabled ? (
+                        <button className="btn btn-sm" onClick={() => recognize(p)} disabled={Boolean(recognizing)}>
+                          {recognizing === p.id ? "Распознаём…" : "Распознать"}
+                        </button>
+                      ) : null}
+                      <button className="btn btn-sm btn-danger" onClick={() => removePhoto(p.id)}>Удалить</button>
+                    </div>
+                  ) : null}
                 </figure>
               ))}
             </div>
-            {canWrite ? <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={upload} style={{ marginTop: 12 }} /> : null}
+            {canWrite && recognition.data && !recognition.data.enabled ? <RecognitionOff status={recognition.data} /> : null}
+            {recError ? <Notice tone="danger">{recError}</Notice> : null}
+            {result ? (
+              <RecognitionResult result={result} applyLabel="Подставить в пустые поля карточки"
+                                 onApply={canWrite ? () => setPrefill({ values: result.fields as Record<string, string>, nonce: Date.now() }) : undefined} />
+            ) : null}
           </Card>
         </div>
       </div>
