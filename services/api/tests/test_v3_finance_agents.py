@@ -12,9 +12,9 @@ from app.services import finance_model
 from app.services.common import today
 from app.services.finance_model import Flow
 from app.worker.runner import run_once
-from tests.helpers import RUB, buyer_session, create_car, signed_deal
+from tests.helpers import RUB, buyer_session, create_car, signed_deal, valid_png
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+PNG = valid_png()
 
 
 def test_reserve_and_free_cash(admin):

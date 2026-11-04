@@ -69,17 +69,19 @@ def car_short(car: Car | None) -> dict[str, Any] | None:
     return {"id": car.id, "title": f"{car.make} {car.model}, {car.year}", "vin": car.vin}
 
 
-def application_staff(a: Application) -> dict[str, Any]:
+def application_staff(a: Application, actor: Actor) -> dict[str, Any]:
     return {
-        "id": a.id, "kind": a.kind, "status": a.status, "name": a.name, "phone": a.phone,
+        "id": a.id, "kind": a.kind, "status": a.status, "name": a.name,
+        "phone": a.phone if actor.can("clients.pd") else mask_phone(a.phone),
         "car": car_short(a.car), "client_id": a.client_id,
         "desired_down_payment_kopecks": a.desired_down_payment_kopecks,
-        "desired_term_months": a.desired_term_months, "comment": a.comment,
+        "desired_term_months": a.desired_term_months, "comment": a.comment if actor.can("clients.pd") else "",
         "wanted_make": a.wanted_make, "wanted_model": a.wanted_model, "wanted_year": a.wanted_year,
         "wanted_trim": a.wanted_trim, "max_budget_kopecks": a.max_budget_kopecks,
         "consent_personal_data": a.consent_personal_data, "consent_version": a.consent_version,
-        "public_message": a.public_message, "internal_note": a.internal_note,
-        "public_token": a.public_token, "created_at": a.created_at, "updated_at": a.updated_at,
+        "public_message": a.public_message, "internal_note": a.internal_note if actor.can("clients.pd") else "",
+        "public_token": a.public_token if actor.can("clients.pd") else "",
+        "created_at": a.created_at, "updated_at": a.updated_at,
         "events": [{"from_status": e.from_status, "to_status": e.to_status,
                     "public_message": e.public_message, "created_at": e.created_at} for e in a.events],
     }
@@ -100,16 +102,16 @@ def client_staff(c: Client, actor: Actor) -> dict[str, Any]:
     return {
         "id": c.id, "party_type": c.party_type, "full_name": c.full_name,
         "phone": c.phone if full else mask_phone(c.phone),
-        "email": c.email, "address": c.address if full else ("указан" if c.address else ""),
+        "email": c.email if full else "", "address": c.address if full else ("указан" if c.address else ""),
         "birth_date": c.birth_date if full else None,
         "passport_number": c.passport_number if full else mask_tail(c.passport_number, 2),
         "passport_issued_by": c.passport_issued_by if full else "",
         "passport_issue_date": c.passport_issue_date if full else None,
         "inn": c.inn, "ogrn": c.ogrn, "kpp": c.kpp, "representative": c.representative,
         "timezone": c.timezone, "identity_verified": c.identity_verified,
-        "identity_verified_at": c.identity_verified_at, "notes": c.notes,
+        "identity_verified_at": c.identity_verified_at, "notes": c.notes if full else "",
         "has_cabinet_access": bool(c.user and c.user.password_hash and c.user.is_active),
-        "cabinet_login": c.user.login if c.user else None,
+        "cabinet_login": c.user.login if c.user and full else None,
         "created_at": c.created_at, "pd_masked": not full,
     }
 

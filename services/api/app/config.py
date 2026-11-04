@@ -1,8 +1,22 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def resource_directory(relative: str) -> Path:
+    source = Path(__file__).resolve()
+    # app/knowledge is Python code; the bundled records live outside the app package.
+    for root in source.parents[1:]:
+        candidate = root / relative
+        if candidate.is_dir():
+            return candidate
+    # A packaged installation may supply the directories through environment variables.
+    # This fallback must also be safe at shallow paths such as /app/app/config.py.
+    return source.parent.parent / relative
 
 
 class Settings(BaseSettings):
@@ -10,7 +24,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    environment: str = Field(default="development", description="development | test | production")
+    environment: Literal["development", "test", "production"] = "development"
     database_url: str = "postgresql+psycopg://islamcar:islamcar@localhost:5433/islamcar"
     storage_dir: Path = Path("storage")
 
@@ -34,10 +48,10 @@ class Settings(BaseSettings):
     require_owner_2fa: bool | None = None
 
     # Документы: каталог утверждённых шаблонов и шрифт с кириллицей для PDF
-    templates_dir: Path = Path(__file__).resolve().parents[3] / "templates" / "contracts"
+    templates_dir: Path = resource_directory("templates/contracts")
     document_font_dir: Path | None = None
     # Библиотеки знаний (legal, accounting, islamic-finance) и срок, после которого проверка считается устаревшей
-    knowledge_dir: Path = Path(__file__).resolve().parents[3] / "knowledge"
+    knowledge_dir: Path = resource_directory("knowledge")
     knowledge_stale_days: int = 180
 
     # Каналы уведомлений. "log" — тестовый режим: сообщение пишется в журнал, наружу не уходит (запрещён в production)
@@ -86,6 +100,22 @@ class Settings(BaseSettings):
     def empty_is_unset(cls, value):
         # docker compose передаёт незаданные переменные как пустую строку
         return None if value == "" else value
+
+    @model_validator(mode="after")
+    def production_safety(self):
+        if self.is_production:
+            if not self.cookie_secure or self.require_owner_2fa is False:
+                raise ValueError("Production requires COOKIE_SECURE=true and owner 2FA")
+            urls = [*self.origins, self.client_public_url]
+            if not self.origins or any(urlsplit(u).scheme != "https" or not urlsplit(u).hostname
+                                       or "*" in u or urlsplit(u).username for u in urls):
+                raise ValueError("Production requires explicit HTTPS origins and client URL")
+            if (self.sms_provider == "log" or self.email_provider == "log" or self.smsru_test
+                    or self.payment_provider == "sandbox" or self.yookassa_secret_key.startswith("test_")):
+                raise ValueError("Test providers are forbidden in production")
+            if self.yookassa_api_url != "https://api.yookassa.ru/v3":
+                raise ValueError("Production payments require the official YooKassa endpoint")
+        return self
 
     @property
     def is_production(self) -> bool:

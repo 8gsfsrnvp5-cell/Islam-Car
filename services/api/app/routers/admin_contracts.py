@@ -57,7 +57,8 @@ LIVE = (ContractStatus.signed, ContractStatus.completed)
 
 
 def get_contract(db: Session, contract_id: uuid.UUID) -> Contract:
-    c = db.get(Contract, contract_id)
+    c = db.scalar(select(Contract).where(Contract.id == contract_id).with_for_update()
+                  .execution_options(populate_existing=True))
     if not c:
         raise HTTPException(404, "Договор не найден")
     return c
@@ -73,16 +74,18 @@ def contract_full(db: Session, c: Contract, actor: Actor) -> dict:
     data = contract_staff(c, ledger_for(db, c), actor)
     data["schedule"] = [{"seq": i.seq, "kind": i.kind, "due_date": i.due_date, "amount_kopecks": i.amount_kopecks}
                         for i in c.schedule]
-    data["payments"] = [payment_dict(p) for p in c.payments]
+    data["payments"] = [payment_dict(p) for p in c.payments] if actor.can("payments.read") else []
     data["reports"] = [report_dict(r) for r in db.scalars(
-        select(PaymentReport).where(PaymentReport.contract_id == c.id).order_by(PaymentReport.created_at.desc()))]
+        select(PaymentReport).where(PaymentReport.contract_id == c.id).order_by(PaymentReport.created_at.desc()))
+        ] if actor.can("payments.read") else []
     if c.status == ContractStatus.draft:
         data["checks"] = checks_dict(run_checks(db, c))
     return data
 
 
 def sellable_car(db: Session, car_id: uuid.UUID) -> Car:
-    car = db.get(Car, car_id)
+    car = db.scalar(select(Car).where(Car.id == car_id).with_for_update()
+                    .execution_options(populate_existing=True))
     if not car:
         raise HTTPException(404, "Автомобиль не найден")
     if car.status in (CarStatus.sold, CarStatus.archived):
@@ -270,6 +273,11 @@ def reverse_payment(payment_id: uuid.UUID, data: ReverseIn, actor: Actor = Depen
     p = db.get(Payment, payment_id)
     if not p:
         raise HTTPException(404, "Платёж не найден")
+    txs = list(db.scalars(select(BankTransaction).where(BankTransaction.payment_id == p.id)
+                         .with_for_update().execution_options(populate_existing=True)))
+    c = get_contract(db, p.contract_id)
+    db.refresh(c, with_for_update=True)
+    db.refresh(p, with_for_update=True)
     if p.status == PaymentStatus.reversed:
         raise HTTPException(409, "Платёж уже сторнирован")
     p.status = PaymentStatus.reversed
@@ -278,7 +286,7 @@ def reverse_payment(payment_id: uuid.UUID, data: ReverseIn, actor: Actor = Depen
     p.reversal_reason = data.reason
     c = get_contract(db, p.contract_id)
     # Поступление из выписки снова ждёт решения: его можно отнести к правильному договору
-    for tx in db.scalars(select(BankTransaction).where(BankTransaction.payment_id == p.id)):
+    for tx in txs:
         tx.status, tx.payment_id, tx.note = "new", None, f"Платёж сторнирован: {data.reason}"
     db.flush()
     sync_completion(db, c)

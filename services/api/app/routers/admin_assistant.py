@@ -19,7 +19,8 @@ router = APIRouter(prefix="/api/admin/assistant", tags=["admin: assistant"])
 
 MAX_QUESTIONS_PER_HOUR = 30
 CONFIRMATION = ("Во внешний сервис (Claude API, Anthropic) передаются только записи библиотек знаний и вопрос "
-                "сотрудника без персональных данных. Данные клиентов, договоров и платежей не передаются.")
+                "сотрудника после автоматической очистки и проверки сотрудником. Очистка не гарантирует удаления всех "
+                "персональных данных; перед отправкой проверьте текст. Карточки клиентов и платежи не передаются.")
 
 
 class AssistantSettingsIn(StrictModel):
@@ -29,6 +30,7 @@ class AssistantSettingsIn(StrictModel):
 
 class QuestionIn(StrictModel):
     question: str = Field(min_length=5, max_length=assistant.MAX_QUESTION)
+    reviewed_question: str | None = Field(default=None, max_length=assistant.MAX_QUESTION)
 
 
 def status_dict(db: Session, actor: Actor) -> dict:
@@ -60,6 +62,12 @@ def update_settings(data: AssistantSettingsIn, actor: Actor = Depends(require("s
     return status_dict(db, actor)
 
 
+@router.post("/preview")
+def preview(data: QuestionIn, actor: Actor = Depends(require("assistant.use")), db: Session = Depends(get_db)):
+    clean, removed = assistant.redact(db, data.question.strip()[:assistant.MAX_QUESTION])
+    return {"question": clean, "removed": removed}
+
+
 @router.post("/ask")
 def ask(data: QuestionIn, actor: Actor = Depends(require("assistant.use")), db: Session = Depends(get_db)):
     hour_ago = datetime.now(UTC) - timedelta(hours=1)
@@ -68,7 +76,7 @@ def ask(data: QuestionIn, actor: Actor = Depends(require("assistant.use")), db: 
         AuditLog.created_at >= hour_ago)) or 0
     if recent >= MAX_QUESTIONS_PER_HOUR:
         raise HTTPException(429, "Слишком много вопросов за час — попробуйте позже")
-    result = assistant.ask(db, data.question, today())
+    result = assistant.ask(db, data.question, today(), reviewed_question=data.reviewed_question)
     # В журнал — только вопрос без персональных данных и ссылки; ответ не хранится
     audit.record(db, actor, "assistant.asked", "assistant", None, question=result["question_sent"],
                  removed=result["removed"], cited=[s["code"] for s in result["sources"]], verdict=result["verdict"])

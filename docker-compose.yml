@@ -22,17 +22,20 @@ services:
       retries: 20
 
   api:
-    build:
+    build: &api-build
       context: .
       dockerfile: services/api/Dockerfile
     image: islamcar-api
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
     environment: &api-env
       ENVIRONMENT: ${ENVIRONMENT:-development}
-      DATABASE_URL: postgresql+psycopg://islamcar:${POSTGRES_PASSWORD}@db:5432/islamcar
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://islamcar:${POSTGRES_PASSWORD}@db:5432/islamcar}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-127.0.0.1}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       COMPANY_TIMEZONE: ${COMPANY_TIMEZONE:-Europe/Moscow}
@@ -65,7 +68,9 @@ services:
 
   # Фоновый обработчик: напоминания, отправка сообщений, контроль сроков, резервные копии
   worker:
-    image: islamcar-api
+    build: *api-build
+    image: islamcar-worker
+    pull_policy: build
     restart: unless-stopped
     depends_on: [api]
     command: ["python", "-m", "app.worker"]

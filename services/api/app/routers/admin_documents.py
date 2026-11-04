@@ -31,13 +31,12 @@ from app.security import Actor, require
 from app.services import audit
 from app.services.addenda import apply_addendum, create_addendum, plan_schedule
 from app.services.common import today
-from app.services.document_audit import audit_documents
+from app.services.document_audit import audit_documents, changed_sections, fresh_context
 from app.services.notify import notify_client, notify_staff
+from app.services.uploads import validate_scan
 
 router = APIRouter(prefix="/api/admin", tags=["admin: documents"])
 
-SIGNED_TYPES = {b"%PDF": ("application/pdf", ".pdf"), b"\xff\xd8\xff": ("image/jpeg", ".jpg"),
-                b"\x89PNG\r\n\x1a\n": ("image/png", ".png")}
 
 
 def docs_dir():
@@ -106,7 +105,9 @@ def revoke_template(code: str, actor: Actor = Depends(require("templates.approve
     approval = registry.active_approval(db, tpl) if tpl else None
     if not approval:
         raise HTTPException(404, "Действующего утверждения нет")
-    approval.revoked_at = datetime.now(UTC)
+    for row in db.scalars(select(TemplateApproval).where(
+            TemplateApproval.template_code == tpl.code, TemplateApproval.revoked_at.is_(None)).with_for_update()):
+        row.revoked_at = datetime.now(UTC)
     audit.record(db, actor, "template.approval_revoked", "template", code)
     db.commit()
     return template_dict(db, tpl)
@@ -115,10 +116,23 @@ def revoke_template(code: str, actor: Actor = Depends(require("templates.approve
 # --- Документы -----------------------------------------------------------------------
 
 def get_doc(db: Session, doc_id: uuid.UUID) -> Document:
-    doc = db.get(Document, doc_id)
+    doc = db.scalar(select(Document).where(Document.id == doc_id).with_for_update()
+                    .execution_options(populate_existing=True))
     if not doc:
         raise HTTPException(404, "Документ не найден")
     return doc
+
+
+def ensure_current(db: Session, doc: Document, *, signing: bool = False) -> None:
+    tpl = registry.get_template(doc.template_code)
+    if not tpl or tpl.sha256 != doc.template_sha256:
+        raise HTTPException(409, "Шаблон изменён — сформируйте документ заново")
+    if (signing or doc.template_approved) and not registry.active_approval(db, tpl):
+        raise HTTPException(409, "Утверждение шаблона отсутствует или отозвано")
+    if hashlib.sha256(doc.body.encode()).hexdigest() != doc.body_sha256:
+        raise HTTPException(409, "Нарушена целостность текста документа")
+    if changed_sections(doc.data.get("ctx", {}), fresh_context(db, doc, today())):
+        raise HTTPException(409, "Исходные данные изменились — сформируйте документ заново")
 
 
 def _sources(db: Session, data: DocumentIn, tpl: registry.Template):
@@ -164,7 +178,7 @@ def list_documents(contract_id: uuid.UUID | None = None, status: DocumentStatus 
 
 
 @router.post("/documents/preview")
-def preview_document(data: DocumentIn, actor: Actor = Depends(require("contracts.write")),
+def preview_document(data: DocumentIn, actor: Actor = Depends(require("documents.content")),
                      db: Session = Depends(get_db)):
     """Проверки и текст без сохранения. При нехватке данных — 422 со списком."""
     tpl = registry.get_template(data.template_code)
@@ -180,7 +194,8 @@ def preview_document(data: DocumentIn, actor: Actor = Depends(require("contracts
 
 
 @router.post("/documents", status_code=201)
-def create(data: DocumentIn, actor: Actor = Depends(require("contracts.write")), db: Session = Depends(get_db)):
+def create(data: DocumentIn, actor: Actor = Depends(require("documents.content")),
+                  db: Session = Depends(get_db)):
     tpl = registry.get_template(data.template_code)
     if not tpl:
         raise HTTPException(404, "Шаблон не найден")
@@ -194,12 +209,14 @@ def create(data: DocumentIn, actor: Actor = Depends(require("contracts.write")),
 
 
 @router.get("/documents/{doc_id}")
-def read_document(doc_id: uuid.UUID, actor: Actor = Depends(require("contracts.read")), db: Session = Depends(get_db)):
+def read_document(doc_id: uuid.UUID, actor: Actor = Depends(require("documents.content")),
+                  db: Session = Depends(get_db)):
     return document_dict(get_doc(db, doc_id), with_body=True)
 
 
 @router.post("/documents/{doc_id}/regenerate")
-def regenerate(doc_id: uuid.UUID, actor: Actor = Depends(require("contracts.write")), db: Session = Depends(get_db)):
+def regenerate(doc_id: uuid.UUID, actor: Actor = Depends(require("documents.content")),
+                  db: Session = Depends(get_db)):
     """Пересобирает черновик из актуальных карточек. Утверждённый и подписанный документ не меняется."""
     doc = get_doc(db, doc_id)
     if doc.status != DocumentStatus.draft:
@@ -225,7 +242,8 @@ def regenerate(doc_id: uuid.UUID, actor: Actor = Depends(require("contracts.writ
 
 
 @router.post("/documents/{doc_id}/submit")
-def submit(doc_id: uuid.UUID, actor: Actor = Depends(require("contracts.write")), db: Session = Depends(get_db)):
+def submit(doc_id: uuid.UUID, actor: Actor = Depends(require("documents.content")),
+                  db: Session = Depends(get_db)):
     doc = get_doc(db, doc_id)
     if doc.status != DocumentStatus.draft:
         raise HTTPException(409, "На утверждение передаётся только черновик")
@@ -243,6 +261,7 @@ def approve(doc_id: uuid.UUID, actor: Actor = Depends(require("contracts.sign"))
     doc = get_doc(db, doc_id)
     if doc.status != DocumentStatus.pending_approval:
         raise HTTPException(409, "Утвердить можно документ, переданный на утверждение")
+    ensure_current(db, doc)
     if any(c.get("level") == "error" for c in doc.checks):
         raise HTTPException(409, "В документе есть непройденные проверки")
     doc.status = DocumentStatus.approved
@@ -254,7 +273,7 @@ def approve(doc_id: uuid.UUID, actor: Actor = Depends(require("contracts.sign"))
 
 
 @router.post("/documents/{doc_id}/cancel")
-def cancel(doc_id: uuid.UUID, data: ReasonIn, actor: Actor = Depends(require("contracts.write")),
+def cancel(doc_id: uuid.UUID, data: ReasonIn, actor: Actor = Depends(require("documents.content")),
            db: Session = Depends(get_db)):
     doc = get_doc(db, doc_id)
     if doc.status == DocumentStatus.signed:
@@ -283,14 +302,13 @@ async def mark_signed(doc_id: uuid.UUID, signed_on: date = Form(...), confirm_pa
     if not doc.template_approved:
         raise HTTPException(409, "Документ из неутверждённого шаблона — это проект, подписывать его как окончательный "
                                  "нельзя. Утвердите шаблон у юриста и сформируйте документ заново.")
+    ensure_current(db, doc, signing=True)
     if file is not None and file.filename:
         limit = get_settings().max_document_bytes
         content = await file.read(limit + 1)
         if len(content) > limit:
             raise HTTPException(413, "Файл слишком большой")
-        kind = next((v for sig, v in SIGNED_TYPES.items() if content.startswith(sig)), None)
-        if not kind:
-            raise HTTPException(415, "Скан принимается в формате PDF, JPEG или PNG")
+        kind = validate_scan(content)
         name = f"{uuid.uuid4().hex}{kind[1]}"
         (docs_dir() / name).write_bytes(content)
         doc.signed_file_name, doc.signed_file_type = name, kind[0]
@@ -331,13 +349,14 @@ def export_response(doc: Document, fmt: str) -> Response:
 
 
 @router.get("/documents/{doc_id}/export")
-def export(doc_id: uuid.UUID, format: str = "pdf", actor: Actor = Depends(require("contracts.read")),
+def export(doc_id: uuid.UUID, format: str = "pdf", actor: Actor = Depends(require("documents.content")),
            db: Session = Depends(get_db)):
     return export_response(get_doc(db, doc_id), format)
 
 
 @router.get("/documents/{doc_id}/signed-file")
-def signed_file(doc_id: uuid.UUID, actor: Actor = Depends(require("contracts.read")), db: Session = Depends(get_db)):
+def signed_file(doc_id: uuid.UUID, actor: Actor = Depends(require("documents.content")),
+                  db: Session = Depends(get_db)):
     doc = get_doc(db, doc_id)
     if not doc.signed_file_name:
         raise HTTPException(404, "Скан не загружен")

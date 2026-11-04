@@ -23,7 +23,7 @@ type Missing = { message: string; missing: string[] };
 
 function DocumentsCard({ contract }: { contract: StaffContract }) {
   const router = useRouter();
-  const canWrite = useCan("contracts.write");
+  const canWrite = useCan("documents.content");
   const docs = useApi<DocItem[]>(`/api/admin/documents?contract_id=${contract.id}`);
   const templates = useApi<DocTemplate[]>("/api/admin/templates");
   const [code, setCode] = useState("");
@@ -54,7 +54,7 @@ function DocumentsCard({ contract }: { contract: StaffContract }) {
           <tbody>
             {docs.data.map((d) => (
               <tr key={d.id}>
-                <td><Link href={`/documents/${d.id}`}>{d.title}</Link>{d.watermark ? <div className="small muted">{d.watermark}</div> : null}</td>
+                <td>{canWrite ? <Link href={`/documents/${d.id}`}>{d.title}</Link> : d.title}{d.watermark ? <div className="small muted">{d.watermark}</div> : null}</td>
                 <td style={{ width: 150 }}><StatusBadge status={d.status} labels={DOC_STATUS} /></td>
               </tr>
             ))}

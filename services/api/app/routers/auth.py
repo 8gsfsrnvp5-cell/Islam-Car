@@ -16,6 +16,7 @@ from app.security import (
     check_password_strength,
     client_ip,
     close_session,
+    consume_totp,
     current_client,
     current_staff,
     ensure_not_throttled,
@@ -23,6 +24,7 @@ from app.security import (
     hash_token,
     open_session,
     record_attempt,
+    revoke_sessions,
     verify_password,
 )
 from app.services import audit
@@ -53,7 +55,7 @@ def admin_login(data: LoginIn, request: Request, response: Response, db: Session
     if user.totp_enabled:
         if not data.totp_code:
             raise HTTPException(401, "totp_required")
-        if not pyotp.TOTP(user.totp_secret).verify(data.totp_code.strip(), valid_window=1):
+        if not consume_totp(db, user, data.totp_code):
             record_attempt(db, login, ip, False)
             raise HTTPException(401, "Неверный код подтверждения")
     record_attempt(db, login, ip, True)
@@ -79,6 +81,7 @@ def admin_change_password(data: ChangePasswordIn, actor: Actor = Depends(current
         raise HTTPException(400, "Текущий пароль указан неверно")
     check_password_strength(data.new_password)
     actor.user.password_hash = hash_password(data.new_password)
+    revoke_sessions(db, actor.user.id, actor.session.id)
     audit.record(db, actor, "user.password_changed", "user", actor.user.id)
     db.commit()
     return {"ok": True}
@@ -92,6 +95,7 @@ def totp_setup(actor: Actor = Depends(current_staff), db: Session = Depends(get_
         raise HTTPException(409, "Второй фактор уже включён")
     secret = pyotp.random_base32()
     actor.user.totp_secret = secret
+    actor.user.totp_last_step = None
     db.commit()
     uri = pyotp.TOTP(secret).provisioning_uri(name=actor.user.login, issuer_name="Islamic Car Admin")
     return {"secret": secret, "otpauth_uri": uri}
@@ -100,9 +104,12 @@ def totp_setup(actor: Actor = Depends(current_staff), db: Session = Depends(get_
 @router.post("/admin/totp/enable")
 def totp_enable(data: TotpCodeIn, actor: Actor = Depends(current_staff), db: Session = Depends(get_db)):
     u = actor.user
-    if not u.totp_secret or not pyotp.TOTP(u.totp_secret).verify(data.code.strip(), valid_window=1):
+    ensure_not_throttled(db, "totp:" + str(u.id), actor.ip)
+    if not u.totp_secret or not consume_totp(db, u, data.code):
+        record_attempt(db, "totp:" + str(u.id), actor.ip, False)
         raise HTTPException(400, "Неверный код. Проверьте время на телефоне и попробуйте снова.")
     u.totp_enabled = True
+    revoke_sessions(db, u.id, actor.session.id)
     audit.record(db, actor, "user.totp_enabled", "user", u.id)
     db.commit()
     return {"ok": True}
@@ -111,9 +118,12 @@ def totp_enable(data: TotpCodeIn, actor: Actor = Depends(current_staff), db: Ses
 @router.post("/admin/totp/disable")
 def totp_disable(data: TotpCodeIn, actor: Actor = Depends(current_staff), db: Session = Depends(get_db)):
     u = actor.user
-    if not u.totp_enabled or not pyotp.TOTP(u.totp_secret).verify(data.code.strip(), valid_window=1):
+    ensure_not_throttled(db, "totp:" + str(u.id), actor.ip)
+    if not u.totp_enabled or not consume_totp(db, u, data.code):
+        record_attempt(db, "totp:" + str(u.id), actor.ip, False)
         raise HTTPException(400, "Неверный код")
     u.totp_enabled = False
+    revoke_sessions(db, u.id, actor.session.id)
     u.totp_secret = None
     audit.record(db, actor, "user.totp_disabled", "user", u.id)
     db.commit()
@@ -154,11 +164,13 @@ def client_me(actor: Actor = Depends(current_client)):
 
 @router.post("/client/activate")
 def client_activate(data: ActivateIn, db: Session = Depends(get_db)):
-    record = db.scalar(select(ActivationToken).where(ActivationToken.token_hash == hash_token(data.token)))
+    record = db.scalar(select(ActivationToken).where(ActivationToken.token_hash == hash_token(data.token))
+                       .with_for_update())
     if not record or record.used_at or as_aware(record.expires_at) <= datetime.now(UTC):
         raise HTTPException(400, "Ссылка недействительна или устарела. Попросите менеджера выдать новую.")
     check_password_strength(data.password)
     user = db.get(User, record.user_id)
+    revoke_sessions(db, user.id)
     user.password_hash = hash_password(data.password)
     user.is_active = True
     record.used_at = datetime.now(UTC)

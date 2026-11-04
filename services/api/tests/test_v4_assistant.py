@@ -58,7 +58,8 @@ def test_question_is_redacted_and_answer_checked_by_system(admin, api_key, monke
     monkeypatch.setattr(assistant, "call_model", fake_call)
     question = (f"Покупатель Иванов (тел. +7 900 111-22-33, паспорт 4510 123456, ivanov@mail.test) по договору "
                 f"{contract['number']} просит отсрочку. Можно ли продлить график?")
-    r = admin.post("/api/admin/assistant/ask", json={"question": question})
+    preview = admin.post("/api/admin/assistant/preview", json={"question": question}).json()
+    r = admin.post("/api/admin/assistant/ask", json={"question": question, "reviewed_question": preview["question"]})
     assert r.status_code == 200, r.text
     body = r.json()
 

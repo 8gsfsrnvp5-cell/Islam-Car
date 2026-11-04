@@ -54,13 +54,13 @@ def list_applications(status: ApplicationStatus | None = None, kind: Application
         stmt = stmt.where(Application.status == status)
     if kind:
         stmt = stmt.where(Application.kind == kind)
-    return [application_staff(a) for a in db.scalars(stmt).all()]
+    return [application_staff(a, actor) for a in db.scalars(stmt).all()]
 
 
 @router.get("/applications/{app_id}")
 def read_application(app_id: uuid.UUID, actor: Actor = Depends(require("applications.read")),
                      db: Session = Depends(get_db)):
-    return application_staff(get_application(db, app_id))
+    return application_staff(get_application(db, app_id), actor)
 
 
 @router.post("/applications/{app_id}/status")
@@ -88,7 +88,7 @@ def change_application_status(app_id: uuid.UUID, data: ApplicationStatusIn,
                       data.public_message, "/cabinet")
     audit.record(db, actor, "application.status", "application", a.id, before=before, after=data.status)
     db.commit()
-    return application_staff(a)
+    return application_staff(a, actor)
 
 
 @router.post("/applications/{app_id}/client")
@@ -155,7 +155,7 @@ def read_client(client_id: uuid.UUID, actor: Actor = Depends(require("clients.re
     live = (ContractStatus.signed, ContractStatus.completed)
     data["contracts"] = [contract_staff(k, ledger_for(db, k) if k.status in live else None, actor, with_rows=False)
                          for k in contracts]
-    data["applications"] = [application_staff(a) for a in db.scalars(
+    data["applications"] = [application_staff(a, actor) for a in db.scalars(
         select(Application).where(Application.client_id == c.id).order_by(Application.created_at.desc()))]
     data["threads"] = [thread_dict(t, with_messages=False, for_staff=True) for t in db.scalars(
         select(SupportThread).where(SupportThread.client_id == c.id).order_by(SupportThread.updated_at.desc()))]

@@ -13,6 +13,7 @@ from pathlib import Path
 
 import psycopg
 from sqlalchemy import select
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -71,6 +72,7 @@ def run_backup(db: Session, now: datetime) -> BackupRun:
             for f in storage.rglob("*"):
                 if f.is_file():
                     z.write(f, f.relative_to(storage))
+        run.files_name, run.files_sha256 = archive.name, sha256_file(archive)
         files_note = f"; файлы: {archive.name}"
 
     run.file_name = dump.name
@@ -112,9 +114,30 @@ def verify_latest(db: Session, now: datetime) -> BackupRun:
         return _finish(run, "failed", f"pg_restore не запустился: {e}")
     if listing.returncode != 0 or "TABLE DATA public contracts" not in listing.stdout:
         return _finish(run, "failed", f"Архив не читается: {listing.stderr.strip()[:1000]}")
+    if latest.files_name:
+        archive = Path(s.backup_dir) / latest.files_name
+        if not archive.is_file() or sha256_file(archive) != latest.files_sha256:
+            return _finish(run, "failed", "Архив файлов отсутствует или контрольная сумма не совпадает")
+        try:
+            with zipfile.ZipFile(archive) as z:
+                if z.testzip() is not None:
+                    return _finish(run, "failed", "Архив файлов повреждён")
+        except (OSError, zipfile.BadZipFile):
+            return _finish(run, "failed", "Архив файлов не читается")
     if not s.backup_verify_database_url:
         return _finish(run, "ok", "Архив цел, контрольная сумма совпадает. Полное восстановление не настроено "
                                   "(BACKUP_VERIFY_DATABASE_URL).")
+    # Fail closed: never run --clean against a production database, including URL aliases.
+    source_name = make_url(s.database_url).database
+    target_name = make_url(s.backup_verify_database_url).database
+    if not target_name or target_name == source_name or not target_name.endswith("_restore_check"):
+        return _finish(run, "failed", "Восстановление разрешено только в отдельную базу с суффиксом _restore_check")
+    with psycopg.connect(libpq_url(s.database_url)) as source_conn, \
+            psycopg.connect(libpq_url(s.backup_verify_database_url)) as target_conn:
+        actual_source = source_conn.execute("select current_database()").fetchone()[0]
+        actual_target = target_conn.execute("select current_database()").fetchone()[0]
+        if actual_target == actual_source or actual_target != target_name:
+            return _finish(run, "failed", "База проверки совпадает с исходной или скрыта подключением")
     restore = subprocess.run([s.pg_restore_path, "--clean", "--if-exists", "--no-owner", "--dbname",
                               libpq_url(s.backup_verify_database_url), str(path)],
                              capture_output=True, text=True, timeout=3600)

@@ -74,6 +74,7 @@ function TemplatesTab() {
 function DocumentsTab() {
   const router = useRouter();
   const [status, setStatus] = useState("");
+  const canReadContent = useCan("documents.content");
   const { data, error, loading } = useApi<DocItem[]>(`/api/admin/documents${status ? `?status=${status}` : ""}`);
   return (
     <>
@@ -89,7 +90,7 @@ function DocumentsTab() {
             <thead><tr><th>Документ</th><th>Создан</th><th>Шаблон</th><th>Статус</th></tr></thead>
             <tbody>
               {data.map((d) => (
-                <tr key={d.id} className="clickable" onClick={() => router.push(`/documents/${d.id}`)}>
+                <tr key={d.id} className={canReadContent ? "clickable" : ""} onClick={() => { if (canReadContent) router.push(`/documents/${d.id}`); }}>
                   <td><strong>{d.title}</strong>{d.watermark ? <div className="small muted">{d.watermark}</div> : null}</td>
                   <td className="small">{formatDateTime(d.created_at)}</td>
                   <td className="small">{d.template_approved ? <Badge tone="ok">утверждён</Badge> : <Badge>черновик</Badge>}</td>
