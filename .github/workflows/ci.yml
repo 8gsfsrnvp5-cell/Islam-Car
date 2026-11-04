@@ -70,3 +70,49 @@ jobs:
       - name: PowerShell 5.1 — синтаксис и безопасный запуск
         shell: powershell
         run: .\scripts\test-windows-launcher.ps1
+
+  local-stack:
+    name: Docker — администратор и клиент через два сайта
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ISLAMCAR_DISPOSABLE_STACK: "1"
+      ISLAMCAR_CHECK_PASSWORD: CI-only-password-2026
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Настроить изолированную локальную базу
+        run: |
+          cat > .env <<'ENV'
+          POSTGRES_PASSWORD=ci-only-database-secret
+          ENVIRONMENT=development
+          COOKIE_SECURE=false
+          CLIENT_PUBLIC_URL=http://localhost:3000
+          PUBLIC_CLIENT_URL=http://localhost:3000
+          ENV
+      - name: Собрать и запустить все пять сервисов
+        run: docker compose up -d --build
+      - name: Дождаться API и создать владельца CI
+        run: |
+          python - <<'PY'
+          import time, urllib.request
+          for attempt in range(90):
+              try:
+                  urllib.request.urlopen("http://localhost:8000/api/health", timeout=5).close()
+                  break
+              except OSError:
+                  time.sleep(2)
+          else:
+              raise SystemExit("API did not become ready")
+          PY
+          docker compose exec -T -e ISLAMCAR_CHECK_PASSWORD api python -m scripts.create_owner --login ci-owner@example.test --name "CI owner" --password-env ISLAMCAR_CHECK_PASSWORD
+      - name: Проверить вход администратора и клиента
+        run: python scripts/check-local-stack.py
+      - name: Логи при сбое
+        if: failure()
+        run: docker compose logs --tail 60
+      - name: Удалить одноразовые контейнеры CI
+        if: always()
+        run: docker compose down -v
