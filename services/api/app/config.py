@@ -4,6 +4,11 @@ from pathlib import Path
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Корень репозитория при запуске из исходников (services/api/app/config.py → корень).
+# В образе Docker файл лежит в /app/app, уровней выше нет — там каталоги задают TEMPLATES_DIR и KNOWLEDGE_DIR.
+_HERE = Path(__file__).resolve()
+REPO_ROOT = _HERE.parents[3] if len(_HERE.parents) > 3 else _HERE.parent
+
 
 class Settings(BaseSettings):
     """Настройки берутся из переменных окружения или файла .env (не хранится в git)."""
@@ -34,10 +39,10 @@ class Settings(BaseSettings):
     require_owner_2fa: bool | None = None
 
     # Документы: каталог утверждённых шаблонов и шрифт с кириллицей для PDF
-    templates_dir: Path = Path(__file__).resolve().parents[3] / "templates" / "contracts"
+    templates_dir: Path = REPO_ROOT / "templates" / "contracts"
     document_font_dir: Path | None = None
     # Библиотеки знаний (legal, accounting, islamic-finance) и срок, после которого проверка считается устаревшей
-    knowledge_dir: Path = Path(__file__).resolve().parents[3] / "knowledge"
+    knowledge_dir: Path = REPO_ROOT / "knowledge"
     knowledge_stale_days: int = 180
 
     # Каналы уведомлений. "log" — тестовый режим: сообщение пишется в журнал, наружу не уходит (запрещён в production)
