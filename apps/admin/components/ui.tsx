@@ -61,6 +61,10 @@ const TONES: Record<string, Tone> = {
   available: "ok", reserved: "warn", sold: "brand", archived: undefined, owned: "ok", purchasing: "warn",
   // обращения
   open: "warn", answered: "info", closed: undefined,
+  // документы, сообщения, залоги, задачи
+  pending_approval: "warn", approved: "info", scheduled: "info", sent: "ok", failed: "danger", skipped: undefined,
+  documents_prepared: "info", submitted: "info", registered: "ok", release_required: "danger",
+  release_submitted: "warn", released: undefined, not_required: undefined, planned: "warn", done: "ok",
 };
 
 export function StatusBadge({ status, labels }: { status: string; labels: Record<string, string> }) {

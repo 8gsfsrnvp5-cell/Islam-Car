@@ -274,3 +274,103 @@ class StaffUserIn(StrictModel):
     full_name: str = Field(min_length=2, max_length=200)
     role: Role
     password: str = Field(max_length=200)
+
+
+# --- Версия 2: документы, графики, уведомления, залоги, задачи ---
+
+class TemplateApproveIn(StrictModel):
+    lawyer_name: str = Field(min_length=3, max_length=200)
+    note: str = Field(default="", max_length=2000)
+
+
+class DocumentIn(StrictModel):
+    template_code: str = Field(min_length=2, max_length=60)
+    contract_id: UUID | None = None
+    client_id: UUID | None = None
+    car_id: UUID | None = None
+    addendum_id: UUID | None = None
+    params: dict[str, str | bool] = Field(default_factory=dict)
+
+
+class ReasonIn(StrictModel):
+    reason: str = Field(min_length=3, max_length=2000)
+
+
+class AddendumIn(StrictModel):
+    term_months: int = Field(ge=1, le=120)
+    first_payment_date: date
+    reason: str = Field(default="", max_length=2000)
+    thread_id: UUID | None = None
+
+
+class RuleIn(StrictModel):
+    id: UUID | None = None
+    event: str = Field(pattern=r"^(before_due|due_day|overdue|payment_confirmed)$")
+    offset_days: int = Field(ge=0, le=60)
+    channels: list[str] = Field(default_factory=list)
+    enabled: bool = True
+
+
+class RulesIn(StrictModel):
+    rules: list[RuleIn]
+
+
+class PolicyIn(StrictModel):
+    weekday_from: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    weekday_to: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    weekend_from: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    weekend_to: str = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    overdue_per_day: int = Field(ge=0, le=10)
+    overdue_per_week: int = Field(ge=0, le=50)
+    overdue_per_month: int = Field(ge=0, le=200)
+    holidays: list[date] = Field(default_factory=list)
+
+
+class ConsentIn(StrictModel):
+    channel: str = Field(pattern=r"^(sms|email)$")
+    granted: bool
+    source: str = Field(min_length=3, max_length=200)
+
+
+class ContactVerifyIn(StrictModel):
+    contact: str = Field(pattern=r"^(phone|email)$")
+    verified: bool = True
+
+
+class PledgeIn(StrictModel):
+    status: str = Field(pattern=r"^(planned|documents_prepared|submitted|registered|release_required|"
+                                r"release_submitted|released|not_required)$")
+    registry_number: str = Field(default="", max_length=60)
+    registered_on: date | None = None
+    notary: str = Field(default="", max_length=300)
+    release_number: str = Field(default="", max_length=60)
+    released_on: date | None = None
+    notes: str = Field(default="", max_length=4000)
+
+
+class InsuranceIn(StrictModel):
+    car_id: UUID
+    contract_id: UUID | None = None
+    kind: str = Field(pattern=r"^(osago|kasko|other)$")
+    number: str = Field(min_length=3, max_length=60)
+    insurer: str = Field(default="", max_length=200)
+    valid_from: date
+    valid_to: date
+    required_by_contract: bool = False
+    notes: str = Field(default="", max_length=2000)
+
+
+class TaskIn(StrictModel):
+    title: str = Field(min_length=3, max_length=300)
+    description: str = Field(default="", max_length=4000)
+    due_date: date | None = None
+    link: str = Field(default="", max_length=300)
+
+
+class TaskDoneIn(StrictModel):
+    note: str = Field(default="", max_length=2000)
+
+
+class ClientConsentIn(StrictModel):
+    channel: str = Field(pattern=r"^(sms|email)$")
+    granted: bool

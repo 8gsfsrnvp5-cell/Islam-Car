@@ -1,0 +1,15 @@
+{
+  "code": "payment_schedule",
+  "version": "0.1-draft",
+  "title": "График платежей",
+  "scope": "contract",
+  "description": "Приложение к договору: даты и суммы платежей.",
+  "requires": [
+    "seller.name",
+    "client.full_name",
+    "contract.number"
+  ],
+  "requires_signed_contract": true,
+  "visible_to_client": true,
+  "params": []
+}

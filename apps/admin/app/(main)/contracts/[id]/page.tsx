@@ -9,6 +9,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 
 import { ConfirmButton, ReasonButton } from "@/components/Confirm";
+import { ContractExtras } from "@/components/ContractExtras";
 import { useCan } from "@/components/Shell";
 import { Badge, Card, ErrorBox, Field, Loading, Notice, PageHead, Stat, StatusBadge } from "@/components/ui";
 import { useAction, useApi } from "@/lib/useApi";
@@ -169,6 +170,7 @@ export default function ContractPage() {
               )}
             </Card>
           ) : null}
+          <ContractExtras contract={c} />
         </div>
 
         <div>
@@ -191,8 +193,8 @@ export default function ContractPage() {
           {c.status === "draft" && canSign ? (
             <Card title="Подписание">
               <Notice tone="info">
-                Печатная форма договора из утверждённых юристом шаблонов появится в версии 2. Сейчас договор оформляется на бумаге,
-                а здесь фиксируется факт подписания. Подписи и печати система не создаёт.
+                Проект договора формируется в разделе «Документы» ниже — из шаблона и данных карточек. После подписания на бумаге
+                здесь фиксируется факт подписания: договору присваивается номер, график фиксируется. Подписи и печати система не создаёт.
               </Notice>
               <form onSubmit={sign} className="grid">
                 <Field label="Дата подписания"><input type="date" value={signedOn} onChange={(e) => setSignedOn(e.target.value)} required /></Field>

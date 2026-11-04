@@ -21,10 +21,12 @@ from app.models import (
     PartyType,
     Payment,
     PaymentStatus,
+    Pledge,
+    PledgeStatus,
     ScheduleItem,
     SellerRegime,
 )
-from app.services.common import today
+from app.services.common import sum_kopecks, today
 from app.services.ledger import LedgerSummary, compute_ledger
 from app.services.schedule import Terms, build_schedule, validate_terms
 
@@ -185,6 +187,10 @@ def sign(db: Session, c: Contract, signed_on: date, user_id) -> CheckReport:
     c.signed_confirmed_by = user_id
     c.car.status = CarStatus.sold
     c.car.is_published = False
+    # Карточка контроля залога: товар, проданный в кредит, по умолчанию находится в залоге у продавца
+    # (п. 5 ст. 488 ГК РФ, если договором не предусмотрено иное). Решение о регистрации — за сотрудником.
+    if not db.scalar(select(Pledge.id).where(Pledge.contract_id == c.id)):
+        db.add(Pledge(contract_id=c.id, status=PledgeStatus.planned, updated_by=user_id))
     if c.application_id:
         app_ = db.get(Application, c.application_id)
         if app_ and app_.status != ApplicationStatus.converted:
@@ -199,7 +205,7 @@ def sign(db: Session, c: Contract, signed_on: date, user_id) -> CheckReport:
 
 def confirmed_total(db: Session, contract_id) -> int:
     return db.scalar(
-        select(func.coalesce(func.sum(Payment.amount_kopecks), 0))
+        select(sum_kopecks(Payment.amount_kopecks))
         .where(Payment.contract_id == contract_id, Payment.status == PaymentStatus.confirmed)) or 0
 
 
@@ -213,9 +219,17 @@ def sync_completion(db: Session, c: Contract) -> None:
     if c.status not in (ContractStatus.signed, ContractStatus.completed):
         return
     outstanding = ledger_for(db, c).outstanding_kopecks
+    pledge = db.scalar(select(Pledge).where(Pledge.contract_id == c.id))
     if outstanding == 0 and c.status == ContractStatus.signed:
         c.status = ContractStatus.completed
         c.completed_at = datetime.now(UTC)
+        if pledge and pledge.status in (PledgeStatus.registered, PledgeStatus.submitted):
+            pledge.status = PledgeStatus.release_required
+        elif pledge and pledge.status in (PledgeStatus.planned, PledgeStatus.documents_prepared):
+            pledge.status = PledgeStatus.not_required
+            pledge.notes = (pledge.notes + "\n" if pledge.notes else "") + "Договор исполнен до регистрации залога."
     elif outstanding > 0 and c.status == ContractStatus.completed:
         c.status = ContractStatus.signed
         c.completed_at = None
+        if pledge and pledge.status == PledgeStatus.release_required:
+            pledge.status = PledgeStatus.registered

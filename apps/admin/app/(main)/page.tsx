@@ -62,6 +62,8 @@ export default function DashboardPage() {
         <Link href="/applications" className="stat"><div className="label">Новые заявки</div><div className="value">{o.new_applications}</div><div className="hint">Ожидают обработки</div></Link>
         <Link href="/payments" className="stat"><div className="label">Сообщения «Я оплатил»</div><div className="value">{o.pending_payment_reports}</div><div className="hint">Нужна сверка с банком</div></Link>
         <Link href="/support" className="stat"><div className="label">Открытые обращения</div><div className="value">{o.open_threads}</div><div className="hint">Ждут ответа</div></Link>
+        <Link href="/tasks" className="stat"><div className="label">Открытые задачи</div><div className="value">{o.open_tasks}</div><div className="hint">Сроки, просрочки, залоги, полисы</div></Link>
+        <Link href="/documents" className="stat"><div className="label">Документы на утверждении</div><div className="value">{o.pending_documents}</div><div className="hint">Залогов к прекращению: {o.pledges_to_release}</div></Link>
       </div>
 
       <div className="section-title"><h2>Деньги и задолженность</h2><span>Договорной объём, поступления и долг — разные величины и не складываются</span></div>

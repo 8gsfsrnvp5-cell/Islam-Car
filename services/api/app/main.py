@@ -4,7 +4,17 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.db import SessionLocal
-from app.routers import admin_cars, admin_contracts, admin_core, admin_crm, auth, client, public
+from app.routers import (
+    admin_cars,
+    admin_contracts,
+    admin_core,
+    admin_crm,
+    admin_documents,
+    admin_ops,
+    auth,
+    client,
+    public,
+)
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
@@ -32,7 +42,7 @@ def create_app() -> FastAPI:
         return response
 
     for r in (public.router, auth.router, client.router, admin_core.router, admin_cars.router,
-              admin_crm.router, admin_contracts.router):
+              admin_crm.router, admin_contracts.router, admin_documents.router, admin_ops.router):
         app.include_router(r)
 
     @app.get("/api/health")

@@ -20,17 +20,23 @@ from app.models import (
     Client,
     Contract,
     ContractStatus,
+    Document,
+    DocumentStatus,
     Expense,
     OwnershipStatus,
     Payment,
     PaymentReport,
     PaymentReportStatus,
     PaymentStatus,
+    Pledge,
+    PledgeStatus,
+    StaffTask,
     SupportThread,
+    TaskStatus,
     ThreadStatus,
 )
 from app.security import Actor
-from app.services.common import today
+from app.services.common import sum_kopecks, today
 from app.services.ledger import LedgerSummary, compute_ledger
 
 LIVE = (ContractStatus.signed, ContractStatus.completed)
@@ -42,7 +48,7 @@ def live_ledgers(db: Session, on: date) -> list[tuple[Contract, LedgerSummary]]:
         .options(selectinload(Contract.schedule), selectinload(Contract.client), selectinload(Contract.car))
     ).all()
     paid = dict(db.execute(
-        select(Payment.contract_id, func.sum(Payment.amount_kopecks))
+        select(Payment.contract_id, sum_kopecks(Payment.amount_kopecks))
         .where(Payment.status == PaymentStatus.confirmed).group_by(Payment.contract_id)).all())
     result = []
     for c in contracts:
@@ -83,7 +89,7 @@ def build_dashboard(db: Session, actor: Actor, period_from: date | None, period_
                 forecast[month_start(r.due_date)] += r.remaining_kopecks
 
     cash_period = db.scalar(
-        select(func.coalesce(func.sum(Payment.amount_kopecks), 0))
+        select(sum_kopecks(Payment.amount_kopecks))
         .where(Payment.status == PaymentStatus.confirmed, Payment.received_on >= p_from,
                Payment.received_on <= p_to)) or 0
 
@@ -115,6 +121,9 @@ def build_dashboard(db: Session, actor: Actor, period_from: date | None, period_
                 PaymentReport.status == PaymentReportStatus.pending)),
             "open_threads": count(select(SupportThread.id).where(SupportThread.status == ThreadStatus.open)),
             "problem_deals": len(problem),
+            "open_tasks": count(select(StaffTask.id).where(StaffTask.status == TaskStatus.open)),
+            "pending_documents": count(select(Document.id).where(Document.status == DocumentStatus.pending_approval)),
+            "pledges_to_release": count(select(Pledge.id).where(Pledge.status == PledgeStatus.release_required)),
         },
         "money": {
             "contracted_volume_kopecks": sum(c.sale_price_kopecks for c, _ in ledgers),
@@ -130,11 +139,11 @@ def build_dashboard(db: Session, actor: Actor, period_from: date | None, period_
     }
 
     if actor.can("finance.read"):
-        opex = db.scalar(select(func.coalesce(func.sum(Expense.amount_kopecks), 0))
+        opex = db.scalar(select(sum_kopecks(Expense.amount_kopecks))
                          .where(Expense.spent_on >= p_from, Expense.spent_on <= p_to)) or 0
         markup_period = sum(c.markup_kopecks for c, _ in ledgers
                             if c.signed_at and p_from <= c.signed_at <= p_to)
-        inventory = db.scalar(select(func.coalesce(func.sum(Car.purchase_price_kopecks), 0)).where(
+        inventory = db.scalar(select(sum_kopecks(Car.purchase_price_kopecks)).where(
             Car.ownership_status == OwnershipStatus.owned,
             Car.status.in_([CarStatus.available, CarStatus.reserved, CarStatus.draft]))) or 0
         data["finance"] = {

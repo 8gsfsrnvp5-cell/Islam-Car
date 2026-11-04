@@ -1,0 +1,41 @@
+{
+  "code": "preliminary_agreement",
+  "version": "0.1-draft",
+  "title": "Предварительное соглашение о покупке автомобиля",
+  "scope": "client",
+  "description": "Намерение купить автомобиль, которого у продавца ещё нет. Не является договором купли-продажи.",
+  "requires": [
+    "seller.name",
+    "client.full_name",
+    "client.phone"
+  ],
+  "params": [
+    {
+      "name": "wanted_car",
+      "label": "Автомобиль (марка, модель, год, комплектация)",
+      "required": true
+    },
+    {
+      "name": "expected_price",
+      "label": "Ориентировочная окончательная цена, руб.",
+      "required": true
+    },
+    {
+      "name": "expected_down_payment",
+      "label": "Предполагаемый первоначальный взнос, руб.",
+      "required": false
+    },
+    {
+      "name": "expected_term",
+      "label": "Предполагаемый срок рассрочки, мес.",
+      "required": false
+    },
+    {
+      "name": "valid_until",
+      "label": "Срок действия соглашения (дата)",
+      "required": true
+    }
+  ],
+  "requires_signed_contract": false,
+  "visible_to_client": false
+}

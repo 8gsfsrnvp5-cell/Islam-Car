@@ -3,6 +3,7 @@ from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
+from sqlalchemy import BigInteger, cast, func
 
 from app.config import get_settings
 
@@ -44,3 +45,8 @@ def mask_phone(phone: str) -> str:
     if len(phone) < 6:
         return mask_tail(phone, 2)
     return phone[:2] + " ••• •••-" + phone[-4:-2] + "-" + phone[-2:]
+
+
+def sum_kopecks(column):
+    """SUM по BIGINT в PostgreSQL возвращает NUMERIC (Decimal) — приводим к целым копейкам прямо в запросе."""
+    return cast(func.coalesce(func.sum(column), 0), BigInteger)

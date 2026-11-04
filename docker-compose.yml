@@ -22,21 +22,47 @@ services:
       retries: 20
 
   api:
-    build: ./services/api
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    image: islamcar-api
     restart: unless-stopped
     depends_on:
       db:
         condition: service_healthy
-    environment:
+    environment: &api-env
       ENVIRONMENT: ${ENVIRONMENT:-development}
       DATABASE_URL: postgresql+psycopg://islamcar:${POSTGRES_PASSWORD}@db:5432/islamcar
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       COMPANY_TIMEZONE: ${COMPANY_TIMEZONE:-Europe/Moscow}
+      REQUIRE_OWNER_2FA: ${REQUIRE_OWNER_2FA:-}
+      SMS_PROVIDER: ${SMS_PROVIDER:-}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      BACKUP_DIR: /backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_VERIFY_DATABASE_URL: ${BACKUP_VERIFY_DATABASE_URL:-}
     volumes:
       - storage:/data/storage
+      - backups:/backups
     ports:
       - "127.0.0.1:8000:8000"
+
+  # Фоновый обработчик: напоминания, отправка сообщений, контроль сроков, резервные копии
+  worker:
+    image: islamcar-api
+    restart: unless-stopped
+    depends_on: [api]
+    command: ["python", "-m", "app.worker"]
+    environment: *api-env
+    volumes:
+      - storage:/data/storage
+      - backups:/backups
 
   client:
     build:
@@ -70,3 +96,4 @@ services:
 volumes:
   pgdata:
   storage:
+  backups:

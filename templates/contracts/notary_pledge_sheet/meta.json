@@ -1,0 +1,18 @@
+{
+  "code": "notary_pledge_sheet",
+  "version": "0.1-draft",
+  "title": "Сведения для нотариуса: уведомление о залоге",
+  "scope": "contract",
+  "description": "Сводка данных для подачи уведомления о залоге. Не является самим уведомлением.",
+  "requires": [
+    "seller.name",
+    "seller.inn",
+    "client.full_name",
+    "client.identity_doc",
+    "car.vin",
+    "contract.number"
+  ],
+  "requires_signed_contract": true,
+  "visible_to_client": false,
+  "params": []
+}

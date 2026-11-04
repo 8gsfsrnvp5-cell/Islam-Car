@@ -15,6 +15,7 @@ if (-not (Test-Path (Join-Path $api ".env"))) {
 }
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$api'; .\.venv\Scripts\python.exe -m alembic upgrade head; .\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$api'; .\.venv\Scripts\python.exe -m app.worker"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; npm run dev:client"
 Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$root'; npm run dev:admin"
 

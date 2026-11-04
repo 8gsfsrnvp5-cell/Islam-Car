@@ -186,3 +186,21 @@ input[type=checkbox] { width: auto; min-height: 0; }
 .login h1 { margin-bottom: 4px; }
 .login form { display: grid; gap: 12px; margin-top: 18px; }
 .secret { word-break: break-all; background: var(--surface-2); border: 1px dashed var(--line); padding: 8px 10px; border-radius: 8px; }
+
+/* ---------- Документы (версия 2) ---------- */
+.paper { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 6px; padding: 36px 44px; box-shadow: 0 2px 10px rgba(0,0,0,.06); font: 13.5px/1.55 "Times New Roman", Georgia, serif; overflow: hidden; }
+.paper p { text-align: justify; margin: 0 0 8px; }
+.paper-h1 { text-align: center; font-size: 15px; margin: 0 0 6px; }
+.paper-h2 { font-size: 13.5px; margin: 14px 0 6px; }
+.paper-note { font-size: 12px; color: var(--muted); }
+.paper-table { margin: 6px 0 12px; font-size: 12.5px; }
+.paper-table th, .paper-table td { border: 1px solid #cfd3cf; padding: 4px 8px; }
+.paper-total td { font-weight: 700; }
+.paper-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 24px; margin-top: 24px; }
+.paper-mark { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: rgba(200, 60, 60, .16); font: 800 38px/1.1 "Inter", sans-serif; transform: rotate(-28deg); text-align: center; }
+mark.lawyer { background: #fff1c2; border-bottom: 2px solid #e2a400; padding: 0 3px; border-radius: 3px; font-family: "Inter", "Segoe UI", sans-serif; font-size: 12.5px; }
+.inline-form { display: grid; gap: 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 12.5px; background: var(--surface-2); }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--muted); }
+.dot.ok { background: var(--ok); }
+.dot.bad { background: var(--danger); }

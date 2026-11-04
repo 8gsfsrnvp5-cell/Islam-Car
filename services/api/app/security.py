@@ -139,7 +139,17 @@ def _load_actor(request: Request, db: Session, realm: Realm) -> Actor:
         raise HTTPException(403, "Нет доступа")
     if realm == Realm.client and (user.role != Role.client or user.client_id is None):
         raise HTTPException(403, "Нет доступа")
+    if (realm == Realm.admin and user.role == Role.owner and not user.totp_enabled
+            and get_settings().owner_2fa_required and request.url.path not in OWNER_PATHS_WITHOUT_2FA):
+        # Владелец без второго фактора может только включить его
+        raise HTTPException(403, "owner_2fa_required")
     return Actor(user=user, session=sess, ip=client_ip(request))
+
+
+OWNER_PATHS_WITHOUT_2FA = {
+    "/api/auth/admin/me", "/api/auth/admin/logout", "/api/auth/admin/password",
+    "/api/auth/admin/totp/setup", "/api/auth/admin/totp/enable",
+}
 
 
 def current_staff(request: Request, db: Session = Depends(get_db)) -> Actor:

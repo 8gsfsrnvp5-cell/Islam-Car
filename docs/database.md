@@ -32,6 +32,24 @@ PostgreSQL, миграции Alembic (`services/api/alembic/versions`). Моде
 | `notifications` | внутренние уведомления | `audience` (staff/client), `client_id`, `title`, `link`, `read_at` |
 | `audit_log` | журнал действий | `actor_user_id`, `action`, `entity_type`, `entity_id`, `data`, `ip` |
 
+## Таблицы версии 2
+
+| Таблица | Назначение |
+|---|---|
+| `jobs`, `worker_heartbeats` | очередь фоновых задач и сигналы обработчика |
+| `notification_rules` | расписание напоминаний: событие, дни, каналы |
+| `consents` | согласия клиента по каналам (каждое изменение — новая запись) |
+| `outbound_messages` | журнал сообщений клиентам: канал, текст, адрес в маске, статус и причина, ключ от повторов |
+| `template_approvals` | утверждение шаблона юристом: версия, SHA-256 содержимого, ФИО юриста |
+| `documents` | документы: шаблон, данные, проверки, текст и его SHA-256, статус, скан подписанного |
+| `addenda`, `schedule_history` | доп. соглашения об изменении графика и прежние версии графика |
+| `pledges`, `insurance_policies` | контроль залога и полисов |
+| `staff_tasks` | задачи сотрудникам (ручные и от контроля сроков) |
+| `backup_runs` | журнал резервных копий и проверок восстановления |
+
+Также добавлены: `clients.phone_verified`, `clients.email_verified`, `company_settings.communication_policy`,
+`contracts.schedule_version`. Суммы из SQL-агрегатов приводятся к BIGINT (`sum_kopecks`).
+
 ## Как считается остаток долга
 
 Распределение платежей по графику **не хранится**, а вычисляется функцией `compute_ledger`

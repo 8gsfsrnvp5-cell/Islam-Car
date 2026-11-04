@@ -1,0 +1,16 @@
+{
+  "code": "overdue_notice",
+  "version": "0.1-draft",
+  "title": "Уведомление о просроченном платеже",
+  "scope": "contract",
+  "description": "Нейтральное уведомление. Без угроз и без начисления неустойки.",
+  "requires": [
+    "seller.name",
+    "client.full_name",
+    "contract.number",
+    "ledger.has_overdue"
+  ],
+  "requires_signed_contract": true,
+  "visible_to_client": true,
+  "params": []
+}

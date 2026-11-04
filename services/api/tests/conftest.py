@@ -10,6 +10,12 @@ import tempfile
 os.environ["DATABASE_URL"] = os.environ.get("TEST_DATABASE_URL", "sqlite://")
 os.environ["ENVIRONMENT"] = "test"
 os.environ["STORAGE_DIR"] = tempfile.mkdtemp(prefix="islamcar-test-")
+# Внешние каналы в тестовом режиме: сообщения пишутся в журнал, наружу ничего не уходит
+os.environ["SMS_PROVIDER"] = "log"
+os.environ["EMAIL_PROVIDER"] = "log"
+# Переменные окружения важнее файла .env: локальные настройки стенда не влияют на тесты
+os.environ["BACKUP_DIR"] = ""
+os.environ["REQUIRE_OWNER_2FA"] = ""
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

@@ -198,6 +198,46 @@ function AuditCard() {
   );
 }
 
+type Backups = {
+  configured: boolean; retention_days: number; backup_hour: number; full_restore_check: boolean;
+  runs: { id: string; kind: string; status: string; file_name: string; size_bytes: number; detail: string; started_at: string }[];
+};
+
+function BackupsCard() {
+  const { data, error, reload } = useApi<Backups>("/api/admin/backups", 15000);
+  const action = useAction();
+  const [msg, setMsg] = useState<string | null>(null);
+  const run = async (kind: string) => {
+    const r = await action.run(() => api<{ message: string }>(`/api/admin/backups/${kind}`, { method: "POST" }));
+    if (r) { setMsg(r.message); reload(); }
+  };
+  if (!data) return error ? <ErrorBox error={error} /> : null;
+  return (
+    <Card title="Резервные копии" subtitle="Выполняет фоновый обработчик: база (pg_dump) и файлы, проверка восстановления">
+      <ErrorBox error={action.error} />
+      {msg ? <Notice tone="ok">{msg}</Notice> : null}
+      {data.configured ? (
+        <p className="small">Ежедневно в {data.backup_hour}:00, хранение {data.retention_days} дн. Проверка восстановления — еженедельно,
+          {data.full_restore_check ? " полным восстановлением в отдельную базу." : " по целостности архива (полное восстановление не настроено)."}</p>
+      ) : <Notice tone="warn" title="Не настроено">Задайте BACKUP_DIR на сервере (каталог вне веб-доступа, лучше на отдельном диске). Работает только с PostgreSQL.</Notice>}
+      <div className="actions" style={{ marginBottom: 10 }}>
+        <button className="btn btn-sm" onClick={() => run("backup")} disabled={action.busy}>Сделать копию сейчас</button>
+        <button className="btn btn-sm" onClick={() => run("verify_backup")} disabled={action.busy}>Проверить последнюю</button>
+      </div>
+      <table><tbody>
+        {data.runs.map((r) => (
+          <tr key={r.id}>
+            <td className="small">{formatDateTime(r.started_at)}</td>
+            <td className="small">{r.kind === "backup" ? "Копия" : "Проверка"}</td>
+            <td>{r.status === "ok" ? <Badge tone="ok">успешно</Badge> : r.status === "failed" ? <Badge tone="danger">ошибка</Badge> : <Badge>{r.status}</Badge>}</td>
+            <td className="small muted">{r.file_name} {r.size_bytes ? `· ${(r.size_bytes / 1024 / 1024).toFixed(1)} МБ` : ""}<div>{r.detail}</div></td>
+          </tr>
+        ))}
+      </tbody></table>
+    </Card>
+  );
+}
+
 export default function SettingsPage() {
   const canUsers = useCan("users.manage");
   const canAudit = useCan("audit.read");
@@ -208,6 +248,7 @@ export default function SettingsPage() {
         <div>
           <CompanyCard />
           {canUsers ? <UsersCard /> : null}
+          {canUsers ? <BackupsCard /> : null}
           {canAudit ? <AuditCard /> : null}
         </div>
         <AccountCard />

@@ -1,0 +1,35 @@
+{
+  "code": "sale_contract",
+  "version": "0.1-draft",
+  "title": "Договор купли-продажи автомобиля с оплатой в рассрочку",
+  "scope": "contract",
+  "description": "Основной договор. Цена окончательная, без процентов и неустойки за просрочку.",
+  "requires": [
+    "seller.name",
+    "seller.inn",
+    "seller.address",
+    "seller.bank_name",
+    "seller.bank_bik",
+    "seller.bank_account",
+    "client.full_name",
+    "client.address",
+    "client.identity_doc",
+    "car.vin",
+    "car.color",
+    "car.purchase_document"
+  ],
+  "visible_to_client": true,
+  "params": [
+    {
+      "name": "place",
+      "label": "Место составления (город)",
+      "required": false
+    },
+    {
+      "name": "require_insurance",
+      "label": "Покупатель обязан поддерживать полис ОСАГО",
+      "type": "bool"
+    }
+  ],
+  "requires_signed_contract": false
+}
