@@ -1,0 +1,23 @@
+[project]
+name = "islamic-car-api"
+version = "0.1.0"
+description = "Islamic Car — сервер и бизнес-логика"
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# B008: Depends() в аргументах — штатный приём FastAPI
+ignore = ["B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# Миграции генерируются Alembic
+"alembic/versions/*" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]

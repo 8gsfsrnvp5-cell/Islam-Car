@@ -1,0 +1,19 @@
+{
+  "name": "islamic-car",
+  "private": true,
+  "description": "Islamic Car — монорепозиторий: клиентский сайт, административная панель, общие типы",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:client": "npm run dev -w @islamic-car/client",
+    "dev:admin": "npm run dev -w @islamic-car/admin",
+    "build": "npm run build -w @islamic-car/client && npm run build -w @islamic-car/admin",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test:shared": "npm run test -w @islamic-car/shared"
+  },
+  "engines": {
+    "node": ">=20.9"
+  }
+}

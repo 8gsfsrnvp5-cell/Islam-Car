@@ -1,0 +1,110 @@
+# Запуск на Windows (PowerShell)
+
+Два способа. Первый проще, второй — если Docker Desktop не установлен.
+
+## Способ 1. Docker Desktop
+
+Требуется: Docker Desktop с включённым WSL 2, Git.
+
+```powershell
+git clone https://github.com/8gsfsrnvp5-cell/Islam-Car.git
+cd Islam-Car
+Copy-Item .env.example .env
+notepad .env                       # задайте длинный POSTGRES_PASSWORD
+docker compose up -d --build       # первая сборка — несколько минут
+docker compose ps                  # все четыре сервиса должны быть в состоянии running
+```
+
+Создайте учётную запись владельца (пароль вводится скрыто, не короче 10 символов):
+
+```powershell
+docker compose exec api python -m scripts.create_owner --login owner@example.ru --name "Фамилия Имя"
+```
+
+- Админка: http://localhost:3001
+- Сайт: http://localhost:3000
+- Документация API: http://localhost:8000/api/docs (отключается при `ENVIRONMENT=production`)
+
+Остановка — `docker compose down`. Данные базы и фото сохраняются в томах `pgdata` и `storage`
+и не удаляются при перезапуске. Полное удаление данных: `docker compose down -v` (необратимо).
+
+## Способ 2. Без Docker
+
+Требуется: Python 3.12+, Node.js 20.9+ (рекомендуется 22 или 24), PostgreSQL 15+.
+
+### 1. База данных
+
+В `psql` от имени администратора PostgreSQL:
+
+```sql
+CREATE USER islamcar WITH PASSWORD 'придумайте-пароль';
+CREATE DATABASE islamcar OWNER islamcar;
+CREATE DATABASE islamcar_test OWNER islamcar;  -- для автотестов
+```
+
+### 2. Сервер API
+
+```powershell
+cd services\api
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+Copy-Item .env.example .env
+notepad .env                       # укажите пароль в DATABASE_URL
+alembic upgrade head
+python -m scripts.create_owner --login owner@example.ru --name "Фамилия Имя"
+uvicorn app.main:app --port 8000
+```
+
+Если PowerShell запрещает запуск `Activate.ps1`, выполните один раз:
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
+
+### 3. Сайт и админка
+
+В новом окне PowerShell, из корня репозитория:
+
+```powershell
+npm install
+npm run dev:client                 # http://localhost:3000
+```
+
+И ещё в одном окне:
+
+```powershell
+npm run dev:admin                  # http://localhost:3001
+```
+
+Если API запущен не на `http://localhost:8000`, задайте адрес перед запуском: `$env:API_INTERNAL_URL = "http://адрес:порт"`.
+
+## Проверки
+
+```powershell
+# API: линтер и 41 интеграционный тест (по умолчанию на SQLite в памяти)
+cd services\api
+.\.venv\Scripts\Activate.ps1
+ruff check .
+pytest
+
+# Те же тесты на PostgreSQL (отдельная база с "test" в имени — рабочая база не используется)
+$env:TEST_DATABASE_URL = "postgresql+psycopg://islamcar:пароль@localhost:5432/islamcar_test"
+pytest
+Remove-Item Env:TEST_DATABASE_URL
+
+# Веб: тесты денежных функций, сборка и проверка типов
+cd ..\..
+npm run test:shared
+npm run build
+npm run typecheck
+```
+
+## Первые шаги после входа
+
+1. **Настройки** → заполните продавца и реквизиты для оплаты; включите второй фактор входа.
+2. **Реестр автомобилей** → добавьте автомобиль, укажите собственность, VIN, документ о покупке и цены → «Опубликовать».
+3. Заявки с сайта появятся в разделе **Заявки клиентов** и в уведомлениях.
+4. Из заявки создайте клиента → заполните реквизиты → «Подтвердить личность» → «Подготовить договор».
+5. После подписания на бумаге зафиксируйте подписание в карточке договора и выдайте клиенту доступ в кабинет.
+6. Поступления подтверждайте в карточке договора по банковской выписке.
+
+Демо-карточки автомобилей для локальной разработки: `python -m scripts.seed_demo`
+(работает только при `ENVIRONMENT=development`, карточки помечены «ДЕМО»).
