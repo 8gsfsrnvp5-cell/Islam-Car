@@ -85,11 +85,20 @@ docker compose exec api python -m scripts.create_owner --login owner@example.ru 
 Откройте http://localhost:3001 (админка) и http://localhost:3000 (сайт). Запуск без Docker и подробности —
 в [docs/run-windows.md](docs/run-windows.md).
 
+## Демо-стенд в браузере (GitHub Codespaces)
+
+Чтобы показать систему без своего компьютера и сервера: **Code** → **Codespaces** → **Create codespace on main**.
+Через 5–10 минут в терминале появятся две ссылки (сайт и админка), логин и пароль. Только тестовые данные:
+SMS и письма не отправляются, оплата тестовая. Codespace засыпает, если с ним никто не работает, поэтому
+стенд подходит для показа на встрече, а не для круглосуточной работы. Подробно —
+в [docs/codespaces.md](docs/codespaces.md).
+
 ## Документация
 
 - [Архитектура](docs/architecture.md)
 - [Схема базы данных](docs/database.md)
 - [Запуск на Windows](docs/run-windows.md)
+- [Демо-стенд в GitHub Codespaces](docs/codespaces.md)
 - [План версий](docs/roadmap.md)
 - [Безопасность и персональные данные](docs/security.md)
 - [Тестирование: 20 обязательных сценариев](docs/testing.md)

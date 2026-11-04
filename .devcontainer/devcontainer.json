@@ -1,0 +1,25 @@
+// Islamic Car — демо-стенд в GitHub Codespaces.
+// Кнопка «Code» → «Codespaces» → «Create codespace». Через 5–10 минут в терминале появятся ссылки, логин и пароль.
+// Только тестовые данные: SMS и письма пишутся в журнал, оплата — тестовая без денег. Подробно: docs/codespaces.md
+{
+  "name": "Islamic Car — демо-стенд",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  // Самая маленькая машина (2 ядра, 8 ГБ) — бесплатных часов хватает дольше
+  "hostRequirements": { "cpus": 2, "memory": "8gb" },
+  "forwardPorts": [3000, 3001],
+  "portsAttributes": {
+    "3000": { "label": "Сайт для покупателей", "onAutoForward": "silent" },
+    "3001": { "label": "Админка", "onAutoForward": "silent" },
+    "8000": { "label": "API (внутренний)", "onAutoForward": "ignore" },
+    "5433": { "label": "База данных (внутренняя)", "onAutoForward": "ignore" }
+  },
+  "otherPortsAttributes": { "onAutoForward": "ignore" },
+  // Запуск при каждом старте; повторный запуск не трогает уже созданные данные
+  "postStartCommand": "bash .devcontainer/start-demo.sh",
+  // При каждом открытии редактора — напомнить ссылки
+  "postAttachCommand": "bash .devcontainer/start-demo.sh --status"
+}
