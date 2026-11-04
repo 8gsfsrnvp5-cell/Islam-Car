@@ -75,6 +75,9 @@ PostgreSQL, миграции Alembic (`services/api/alembic/versions`). Моде
 учёта одной операции); `payments.confirmed_by` пуст только у онлайн-оплаты, проверенной у провайдера;
 `company_settings.assistant_policy`. Миграция `0004`.
 
+Версия 5 новых таблиц не добавляет: решение владельца о распознавании фото хранится в
+`company_settings.assistant_policy.car_recognition`, порядок фото — в `car_photos.position`.
+
 ## Как считается остаток долга
 
 Распределение платежей по графику **не хранится**, а вычисляется функцией `compute_ledger`

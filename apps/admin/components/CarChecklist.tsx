@@ -67,7 +67,7 @@ export function CarChecklist({ carId }: { carId: string }) {
           ) : null}
         </div>
       ))}
-      <p className="small muted" style={{ marginTop: 8 }}>Автоматические запросы к источникам (ГИБДД, реестр залогов) появятся после официального подключения — версия 4.</p>
+      <p className="small muted" style={{ marginTop: 8 }}>Автоматические запросы к источникам (ГИБДД, реестр залогов) появятся после официального подключения источников по договорам.</p>
     </Card>
   );
 }

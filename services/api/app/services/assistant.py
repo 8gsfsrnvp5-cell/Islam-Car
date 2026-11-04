@@ -146,16 +146,21 @@ def client():
     return anthropic.Anthropic(api_key=s.anthropic_api_key, timeout=s.assistant_timeout_seconds, max_retries=2)
 
 
-def call_model(system_records: str, user_text: str) -> dict:
+def request_json(*, system: str, content: str | list, schema: dict, max_tokens: int, refusal: str,
+                 cut_off: str, cache_system: bool = False) -> dict:
+    """Запрос к Claude с ответом в виде JSON по схеме. Ошибки сервиса переводятся в понятные сотруднику."""
     import anthropic
     s = get_settings()
+    block: dict = {"type": "text", "text": system}
+    if cache_system:
+        block["cache_control"] = {"type": "ephemeral"}
     try:
         response = client().beta.messages.create(
             model=s.assistant_model,
-            max_tokens=4000,
-            system=[{"type": "text", "text": SYSTEM + system_records, "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": user_text}],
-            output_config={"effort": "medium", "format": {"type": "json_schema", "schema": SCHEMA}},
+            max_tokens=max_tokens,
+            system=[block],
+            messages=[{"role": "user", "content": content}],
+            output_config={"effort": "medium", "format": {"type": "json_schema", "schema": schema}},
             # При отказе модели запрос повторяется на резервной модели внутри того же вызова
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
@@ -173,14 +178,20 @@ def call_model(system_records: str, user_text: str) -> dict:
     except anthropic.APIStatusError as e:
         raise HTTPException(502, f"Ошибка Claude API ({e.status_code})") from None
     if response.stop_reason == "refusal":
-        raise HTTPException(422, "Помощник не стал отвечать на этот вопрос — обратитесь к специалисту")
+        raise HTTPException(422, refusal)
     if response.stop_reason == "max_tokens":
-        raise HTTPException(502, "Ответ помощника оборвался — сформулируйте вопрос короче")
+        raise HTTPException(502, cut_off)
     text = next((b.text for b in response.content if b.type == "text"), "")
     try:
         return json.loads(text)
     except ValueError:
-        raise HTTPException(502, "Помощник вернул ответ в неожиданном формате") from None
+        raise HTTPException(502, "Claude API вернул ответ в неожиданном формате") from None
+
+
+def call_model(system_records: str, user_text: str) -> dict:
+    return request_json(system=SYSTEM + system_records, content=user_text, schema=SCHEMA, max_tokens=4000,
+                        refusal="Помощник не стал отвечать на этот вопрос — обратитесь к специалисту",
+                        cut_off="Ответ помощника оборвался — сформулируйте вопрос короче", cache_system=True)
 
 
 def ask(db: Session, question: str, on: date) -> dict:

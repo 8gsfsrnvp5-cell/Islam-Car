@@ -1,7 +1,7 @@
 "use client";
 
 import { CAR_STATUS, OWNERSHIP, type StaffCar, kopecksToInput, rublesToKopecks } from "@islamic-car/shared";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Field } from "@/components/ui";
 
@@ -39,15 +39,43 @@ function toPayload(v: Values, canCost: boolean, isEdit: boolean): Record<string,
   return out;
 }
 
-export function CarForm({ car, canCost, busy, onSubmit, submitLabel }: {
+/** Подсказка распознавания: заполняет только пустые поля и поля, ранее заполненные ИИ. */
+export type Prefill = { values: Values; nonce: number };
+
+export function CarForm({ car, canCost, busy, onSubmit, submitLabel, prefill, hints }: {
   car?: StaffCar; canCost: boolean; busy: boolean; submitLabel: string;
   onSubmit: (payload: Record<string, unknown>) => void;
+  prefill?: Prefill | null; hints?: Partial<Record<string, string>>;
 }) {
   const [v, setV] = useState<Values>(() => initial(car));
   const [error, setError] = useState<string | null>(null);
+  const [aiFields, setAiFields] = useState<Set<string>>(new Set());
+  // Значения, которые подставил ИИ: поле с таким значением можно обновить новым распознаванием
+  const aiValues = useRef<Values>({});
+  const current = useRef(v);
+  current.current = v;
   const sold = car?.status === "sold";
-  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setV((prev) => ({ ...prev, [k]: e.target.value }));
+    setAiFields((prev) => { if (!prev.has(k)) return prev; const next = new Set(prev); next.delete(k); return next; });
+  };
+
+  useEffect(() => {
+    if (!prefill) return;
+    const cur = current.current;
+    const applied: Values = {};
+    for (const [k, value] of Object.entries(prefill.values)) {
+      if (!value || !(k in cur) || (k === "vin" && sold)) continue;
+      if (cur[k] === "" || (k in aiValues.current && cur[k] === aiValues.current[k])) applied[k] = value;
+    }
+    const keys = Object.keys(applied);
+    if (!keys.length) return;
+    aiValues.current = { ...aiValues.current, ...applied };
+    setV((prev) => ({ ...prev, ...applied }));
+    setAiFields((prev) => new Set([...prev, ...keys]));
+  }, [prefill, sold]);
+
+  const ai = (k: string, title: string) => (aiFields.has(k) ? <>{title} <span className="ai-tag">ИИ · проверьте</span></> : title);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,21 +92,21 @@ export function CarForm({ car, canCost, busy, onSubmit, submitLabel }: {
     <form onSubmit={submit}>
       <h3 style={{ margin: "0 0 10px" }}>Автомобиль</h3>
       <div className="form-grid">
-        <Field label="Марка"><input value={v.make} onChange={set("make")} required /></Field>
-        <Field label="Модель"><input value={v.model} onChange={set("model")} required /></Field>
-        <Field label="Год выпуска"><input type="number" min={1980} max={2100} value={v.year} onChange={set("year")} required /></Field>
+        <Field label={ai("make", "Марка")}><input value={v.make} onChange={set("make")} required /></Field>
+        <Field label={ai("model", "Модель")}><input value={v.model} onChange={set("model")} required /></Field>
+        <Field label="Год выпуска" hint={hints?.year}><input type="number" min={1980} max={2100} value={v.year} onChange={set("year")} required /></Field>
         <Field label="Пробег, км"><input type="number" min={0} value={v.mileage_km} onChange={set("mileage_km")} /></Field>
-        <Field label="VIN" hint="17 символов. Обязателен для автомобиля в собственности.">
+        <Field label={ai("vin", "VIN")} hint="17 символов. Обязателен для автомобиля в собственности.">
           <input value={v.vin} onChange={set("vin")} maxLength={17} className="mono" disabled={sold} />
         </Field>
-        <Field label="Цвет"><input value={v.color} onChange={set("color")} /></Field>
-        <Field label="Кузов"><input value={v.body_type} onChange={set("body_type")} placeholder="седан, кроссовер…" /></Field>
+        <Field label={ai("color", "Цвет")}><input value={v.color} onChange={set("color")} /></Field>
+        <Field label={ai("body_type", "Кузов")}><input value={v.body_type} onChange={set("body_type")} placeholder="седан, кроссовер…" /></Field>
         <Field label="Двигатель"><input value={v.engine} onChange={set("engine")} placeholder="2.5 л, 181 л.с., бензин" /></Field>
         <Field label="Коробка передач"><input value={v.transmission} onChange={set("transmission")} /></Field>
         <Field label="Привод"><input value={v.drive} onChange={set("drive")} /></Field>
         <Field label="Комплектация" wide><textarea value={v.trim} onChange={set("trim")} /></Field>
         <Field label="Состояние" wide><textarea value={v.condition} onChange={set("condition")} /></Field>
-        <Field label="Описание для каталога" wide><textarea value={v.description} onChange={set("description")} /></Field>
+        <Field label="Описание для каталога" wide hint={hints?.description}><textarea value={v.description} onChange={set("description")} /></Field>
       </div>
 
       <h3 style={{ margin: "20px 0 10px" }}>Собственность и статус</h3>
