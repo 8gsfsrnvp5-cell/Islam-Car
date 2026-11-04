@@ -61,3 +61,17 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
       - run: npm run typecheck
+
+  stack:
+    name: Docker — сборка и запуск демо-стенда, проверка фото
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Запуск так же, как в Codespaces (адреса localhost)
+        run: bash .devcontainer/start-demo.sh
+      - name: Вход, загрузка фото, фото на сайте без метаданных
+        run: python3 .devcontainer/check-demo.py
+      - name: Журналы сервисов при ошибке
+        if: failure()
+        run: docker compose logs --no-color --tail=200
