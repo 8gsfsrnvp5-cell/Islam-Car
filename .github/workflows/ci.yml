@@ -61,3 +61,12 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
       - run: npm run typecheck
+
+  windows-launcher:
+    name: Windows — проверка запуска двух кабинетов
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PowerShell 5.1 — синтаксис и безопасный запуск
+        shell: powershell
+        run: .\scripts\test-windows-launcher.ps1
