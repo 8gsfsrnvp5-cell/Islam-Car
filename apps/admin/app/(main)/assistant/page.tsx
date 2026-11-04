@@ -20,13 +20,20 @@ type Answer = {
 export default function AssistantPage() {
   const status = useApi<Status>("/api/admin/assistant");
   const [question, setQuestion] = useState("");
+  const [preview, setPreview] = useState<{ question: string; removed: string[] } | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const action = useAction();
 
   async function ask(e: React.FormEvent) {
     e.preventDefault();
-    const r = await action.run(() => api<Answer>("/api/admin/assistant/ask", { method: "POST", json: { question } }));
-    if (r) setAnswer(r);
+    const r = await action.run(() => api<{ question: string; removed: string[] }>("/api/admin/assistant/preview", { method: "POST", json: { question } }));
+    if (r) setPreview(r);
+  }
+
+  async function sendReviewed() {
+    if (!preview) return;
+    const r = await action.run(() => api<Answer>("/api/admin/assistant/ask", { method: "POST", json: { question, reviewed_question: preview.question } }));
+    if (r) { setAnswer(r); setPreview(null); }
   }
 
   const st = status.data;
@@ -50,15 +57,22 @@ export default function AssistantPage() {
           ) : (
             <Card title="Вопрос" subtitle={st.data_scope}>
               <form onSubmit={ask}>
-                <textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={4} minLength={5} maxLength={2000}
+                <textarea value={question} onChange={(e) => { setQuestion(e.target.value); setPreview(null); }} disabled={action.busy} rows={4} minLength={5} maxLength={2000}
                           placeholder="Например: можно ли продлить срок рассрочки дополнительным соглашением и сохранить цену?"
                           style={{ width: "100%" }} required />
                 <p className="small muted">Не указывайте ФИО, телефоны, паспортные данные, номера договоров: они вырезаются автоматически,
                   но проверка не идеальна.</p>
                 <ErrorBox error={action.error} />
                 <button className="btn btn-primary" disabled={action.busy || question.trim().length < 5}>
-                  {action.busy ? "Готовлю ответ…" : "Спросить"}</button>
+                  {action.busy ? "Проверяю…" : "Проверить перед отправкой"}</button>
               </form>
+              {preview ? <Notice tone="warn" title="Проверьте текст для отправки в Claude API">
+                <p style={{ whiteSpace: "pre-wrap" }}>{preview.question}</p>
+                <p>Если остались имена, адреса или другие персональные данные, исправьте вопрос выше.</p>
+                <button type="button" className="btn btn-primary" disabled={action.busy} onClick={sendReviewed}>
+                  {action.busy ? "Готовлю ответ…" : "Данных клиентов нет — отправить"}
+                </button>
+              </Notice> : null}
             </Card>
           )}
           {answer ? (

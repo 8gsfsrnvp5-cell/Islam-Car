@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from app.config import get_settings
 from app.db import SessionLocal
+from app.request_limits import RequestSizeLimit
 from app.routers import (
     admin_accounting,
     admin_agents,
@@ -41,7 +42,10 @@ def create_app() -> FastAPI:
     async def origin_guard(request: Request, call_next):
         # Защита от CSRF: изменяющие запросы принимаются только со своих сайтов
         origin = request.headers.get("origin")
-        if request.method in UNSAFE_METHODS and origin and origin not in settings.origins:
+        if request.method in UNSAFE_METHODS and (
+                (origin and origin not in settings.origins)
+                or request.headers.get("sec-fetch-site") == "cross-site"
+                or (settings.is_production and request.cookies and not origin)):
             return JSONResponse({"detail": "Запрос с недоверенного источника отклонён"}, status_code=403)
         response = await call_next(request)
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -63,6 +67,7 @@ def create_app() -> FastAPI:
             db.execute(text("select 1"))
         return {"status": "ok", "environment": settings.environment}
 
+    app.add_middleware(RequestSizeLimit, max_bytes=24 * 1024 * 1024)
     return app
 
 

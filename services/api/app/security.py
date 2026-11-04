@@ -1,12 +1,14 @@
 import hashlib
 import secrets
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
+import pyotp
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
 from fastapi import Depends, HTTPException, Request, Response
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -47,9 +49,7 @@ def new_token() -> str:
 
 
 def client_ip(request: Request) -> str | None:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    # Only the ASGI server may resolve headers from explicitly trusted proxies.
     return request.client.host if request.client else None
 
 
@@ -98,6 +98,29 @@ def open_session(db: Session, response: Response, request: Request, user: User, 
         COOKIE_NAMES[realm], token, max_age=hours * 3600, httponly=True,
         secure=s.cookie_secure, samesite="lax", path="/",
     )
+
+
+def consume_totp(db: Session, user: User, code: str) -> bool:
+    if not user.totp_secret:
+        return False
+    totp = pyotp.TOTP(user.totp_secret)
+    step = int(time.time()) // totp.interval
+    matched = next((s for s in (step, step - 1, step + 1)
+                    if secrets.compare_digest(totp.at(s * totp.interval), code.strip())), None)
+    if matched is None:
+        return False
+    result = db.execute(update(User).where(
+        User.id == user.id, User.totp_secret == user.totp_secret,
+        (User.totp_last_step.is_(None)) | (User.totp_last_step < matched),
+    ).values(totp_last_step=matched))
+    return result.rowcount == 1
+
+
+def revoke_sessions(db: Session, user_id, keep_id=None) -> None:
+    stmt = update(Session_).where(Session_.user_id == user_id, Session_.revoked_at.is_(None))
+    if keep_id is not None:
+        stmt = stmt.where(Session_.id != keep_id)
+    db.execute(stmt.values(revoked_at=datetime.now(UTC)))
 
 
 def close_session(db: Session, request: Request, response: Response, realm: Realm) -> None:

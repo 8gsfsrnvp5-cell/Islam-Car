@@ -29,8 +29,8 @@ def create_car(admin: TestClient, vin: str = "XTA21099012345678", owned: bool = 
         "vin": vin, "make": "Toyota", "model": "Camry", "year": 2021, "mileage_km": 45000,
         "engine": "2.5 л, 181 л.с.", "transmission": "автомат", "color": "белый",
         "ownership_status": "owned" if owned else "purchasing", "status": "available",
-        "purchase_price_kopecks": purchase * RUB, "purchase_date": "2026-10-01",
-        "purchase_document": "ДКП № 15 от 01.10.2026" if owned else "",
+        "purchase_price_kopecks": purchase * RUB, "purchase_date": (today() - timedelta(days=180)).isoformat(),
+        "purchase_document": "ДКП № 15" if owned else "",
         "sale_price_kopecks": sale * RUB, "min_down_payment_kopecks": 300_000 * RUB, "max_term_months": 24,
     })
     assert r.status_code == 201, r.text
@@ -109,3 +109,12 @@ def signed_deal(admin: TestClient, contract_date: date | None = None, vin: str =
     client = create_verified_client(admin, phone=phone)
     contract = sign(admin, create_contract(admin, client["id"], car["id"], contract_date=contract_date))
     return car, client, contract
+
+
+def valid_png() -> bytes:
+    import io
+
+    from PIL import Image
+    buffer = io.BytesIO()
+    Image.new("RGB", (16, 16), "white").save(buffer, "PNG")
+    return buffer.getvalue()

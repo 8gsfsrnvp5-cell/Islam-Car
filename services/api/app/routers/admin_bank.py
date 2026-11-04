@@ -58,7 +58,8 @@ def contract_numbers(db: Session, txs: list[BankTransaction]) -> dict[uuid.UUID,
 
 
 def get_tx(db: Session, tx_id: uuid.UUID) -> BankTransaction:
-    tx = db.get(BankTransaction, tx_id)
+    tx = db.scalar(select(BankTransaction).where(BankTransaction.id == tx_id).with_for_update()
+                   .execution_options(populate_existing=True))
     if not tx:
         raise HTTPException(404, "Поступление не найдено")
     return tx

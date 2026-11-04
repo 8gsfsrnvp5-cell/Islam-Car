@@ -16,11 +16,13 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -151,6 +153,7 @@ class User(Base):
     role: Mapped[Role] = mapped_column(str_enum(Role))
     password_hash: Mapped[str | None] = mapped_column(String(255))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    totp_last_step: Mapped[int | None] = mapped_column(BigInteger)
     totp_secret: Mapped[str | None] = mapped_column(String(64))
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     client_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("clients.id"), unique=True)
@@ -428,6 +431,10 @@ class ScheduleItem(Base):
 
 
 class Payment(Base):
+    __table_args__ = (Index("uq_payment_external_confirmed", "external_ref", unique=True,
+                           postgresql_where=text("external_ref <> '' AND status = 'confirmed'"),
+                           sqlite_where=text("external_ref <> '' AND status = 'confirmed'")),)
+
     """Поступление денег. Учитывается только подтверждённое сотрудником; не удаляется."""
 
     __tablename__ = "payments"
@@ -848,6 +855,9 @@ class StaffTask(Base):
 
 
 class BackupRun(Base):
+    files_name: Mapped[str] = mapped_column(String(200), default="")
+    files_sha256: Mapped[str] = mapped_column(String(64), default="")
+
     __tablename__ = "backup_runs"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)

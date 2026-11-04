@@ -10,9 +10,9 @@ from app.config import get_settings
 from app.db import SessionLocal
 from app.models import Document, Role, StaffTask
 from tests.conftest import staff_client
-from tests.helpers import COMPANY, signed_deal
+from tests.helpers import COMPANY, signed_deal, valid_png
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+PNG = valid_png()
 
 
 def issues(admin, contract_id: str | None = None) -> list[dict]:

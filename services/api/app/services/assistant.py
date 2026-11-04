@@ -194,12 +194,14 @@ def call_model(system_records: str, user_text: str) -> dict:
                         cut_off="Ответ помощника оборвался — сформулируйте вопрос короче", cache_system=True)
 
 
-def ask(db: Session, question: str, on: date) -> dict:
+def ask(db: Session, question: str, on: date, *, reviewed_question: str | None = None) -> dict:
     st = status(db)
     if not st.enabled:
         raise HTTPException(409, f"Помощник выключен: {st.reason}")
     question = question.strip()[:MAX_QUESTION]
     clean, removed = redact(db, question)
+    if reviewed_question != clean:
+        raise HTTPException(409, "Проверьте очищенный вопрос и подтвердите его отправку")
     records = load_records()
     by_code = {r.code: r for r in records}
     review_lines = [f"{r.code}: {'подтверждена' if record_dict(db, r, on)['reliable'] else 'не подтверждена'}"

@@ -8,7 +8,7 @@ SELECT … FOR UPDATE SKIP LOCKED.
 
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select, update
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models import Job, JobStatus
@@ -30,12 +30,21 @@ def enqueue(db: Session, kind: str, payload: dict, run_at: datetime | None = Non
 
 def requeue_stale(db: Session, now: datetime) -> int:
     """Задачи, взятые обработчиком, который упал или был перезапущен, возвращаются в очередь."""
-    result = db.execute(update(Job).where(Job.status == JobStatus.running, Job.locked_until < now)
-                        .values(status=JobStatus.queued, locked_until=None))
-    return result.rowcount or 0
+    jobs = db.scalars(select(Job).where(Job.status == JobStatus.running, Job.locked_until < now)
+                      .with_for_update(skip_locked=True))
+    count = 0
+    for job in jobs:
+        if db.bind.dialect.name == "postgresql":
+            acquired = db.execute(text("SELECT pg_try_advisory_xact_lock(hashtextextended(:key, 0))"),
+                                  {"key": str(job.id)}).scalar()
+            if not acquired:
+                continue
+        job.status, job.locked_until = JobStatus.queued, None
+        count += 1
+    return count
 
 
-def claim(db: Session, now: datetime, limit: int = 20) -> list[Job]:
+def claim(db: Session, now: datetime, limit: int = 1) -> list[Job]:
     jobs = list(db.scalars(
         select(Job).where(Job.status == JobStatus.queued, Job.run_at <= now)
         .order_by(Job.run_at).limit(limit).with_for_update(skip_locked=True)))

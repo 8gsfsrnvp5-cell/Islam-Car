@@ -25,7 +25,7 @@ def evaluate(db: Session, c: Contract) -> dict:
         return {"state": state, "message": message}
 
     ownership_ok = car.ownership_status == OwnershipStatus.owned and car.purchase_document.strip()
-    purchase_before = car.purchase_date is None or car.purchase_date <= c.contract_date
+    purchase_before = car.purchase_date is not None and car.purchase_date <= c.contract_date
     facts = {
         "ownership": check("ok" if ownership_ok and purchase_before else "problem",
                            "Автомобиль в собственности продавца, документ о покупке указан"

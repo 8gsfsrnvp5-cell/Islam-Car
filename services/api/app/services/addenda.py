@@ -83,6 +83,8 @@ def create_addendum(db: Session, contract: Contract, term_months: int, first_pay
 def apply_addendum(db: Session, addendum: Addendum, signed_on: date, today: date) -> None:
     """Вызывается при фиксации подписания соглашения. Прежний график уходит в историю."""
     contract = db.get(Contract, addendum.contract_id)
+    db.refresh(contract, with_for_update=True)
+    db.refresh(addendum, with_for_update=True)
     if addendum.status != AddendumStatus.draft:
         raise HTTPException(409, "Соглашение уже подписано или отменено")
     if contract.status != ContractStatus.signed:

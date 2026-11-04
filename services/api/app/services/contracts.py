@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.models import (
     Application,
@@ -85,6 +85,9 @@ def apply_terms(c: Contract, t: Terms) -> None:
     installments = [p for p in planned if p.kind == "installment"]
     c.monthly_payment_kopecks = installments[0].amount_kopecks
     c.schedule.clear()
+    db = object_session(c)
+    if db is not None:
+        db.flush()  # Delete old sequence numbers before inserting their replacements.
     c.schedule.extend(ScheduleItem(seq=p.seq, kind=p.kind, due_date=p.due_date,
                                    amount_kopecks=p.amount_kopecks) for p in planned)
 
@@ -109,6 +112,9 @@ def run_checks(db: Session, c: Contract) -> CheckReport:
     r.add("car_owned", car.ownership_status == OwnershipStatus.owned,
           "Автомобиль находится в собственности продавца" if car.ownership_status == OwnershipStatus.owned
           else "Автомобиль ещё не в собственности продавца — продавать его нельзя")
+    r.add("purchase_date", car.purchase_date is not None and car.purchase_date <= c.contract_date,
+          "Дата покупки должна быть указана и не позднее даты продажи")
+    r.add("cost_disclosed", c.disclose_cost_to_buyer, "Для мурабахи покупателю раскрываются себестоимость и наценка")
     r.add("car_vin", bool(car.vin), "VIN указан" if car.vin else "В карточке автомобиля не указан VIN")
     r.add("car_purchase_document", bool(car.purchase_document.strip()),
           "Документ о покупке автомобиля указан" if car.purchase_document.strip()
@@ -181,6 +187,11 @@ def next_contract_number(db: Session, contract_date: date) -> str:
 
 
 def sign(db: Session, c: Contract, signed_on: date, user_id) -> CheckReport:
+    db.refresh(c, with_for_update=True)
+    db.refresh(c.car, with_for_update=True)
+    c.buyer_type = c.client.party_type
+    c.seller_regime = get_company(db).seller_regime
+    c.is_consumer_deal = is_consumer_deal(c.seller_regime, c.buyer_type)
     if c.status != ContractStatus.draft:
         raise HTTPException(409, "Подписать можно только черновик договора")
     report = run_checks(db, c)

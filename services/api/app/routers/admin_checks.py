@@ -13,11 +13,10 @@ from app.db import get_db
 from app.models import Car, CarCheck, Contract
 from app.security import Actor, require
 from app.services import audit, car_checks, murabaha
+from app.services.uploads import validate_scan
 
 router = APIRouter(prefix="/api/admin", tags=["admin: checks"])
 
-EVIDENCE_TYPES = {b"%PDF": ("application/pdf", ".pdf"), b"\xff\xd8\xff": ("image/jpeg", ".jpg"),
-                  b"\x89PNG\r\n\x1a\n": ("image/png", ".png")}
 
 
 def evidence_dir():
@@ -61,9 +60,7 @@ async def record_check(car_id: uuid.UUID, item_code: str = Form(...), status: st
         content = await file.read(get_settings().max_document_bytes + 1)
         if len(content) > get_settings().max_document_bytes:
             raise HTTPException(413, "Файл слишком большой")
-        kind = next((v for sig, v in EVIDENCE_TYPES.items() if content.startswith(sig)), None)
-        if not kind:
-            raise HTTPException(415, "Подтверждение — PDF, JPEG или PNG")
+        kind = validate_scan(content)
         name = f"{uuid.uuid4().hex}{kind[1]}"
         (evidence_dir() / name).write_bytes(content)
         row.evidence_file, row.evidence_type = name, kind[0]

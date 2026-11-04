@@ -1,7 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +12,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    environment: str = Field(default="development", description="development | test | production")
+    environment: Literal["development", "test", "production"] = "development"
     database_url: str = "postgresql+psycopg://islamcar:islamcar@localhost:5433/islamcar"
     storage_dir: Path = Path("storage")
 
@@ -86,6 +88,22 @@ class Settings(BaseSettings):
     def empty_is_unset(cls, value):
         # docker compose передаёт незаданные переменные как пустую строку
         return None if value == "" else value
+
+    @model_validator(mode="after")
+    def production_safety(self):
+        if self.is_production:
+            if not self.cookie_secure or self.require_owner_2fa is False:
+                raise ValueError("Production requires COOKIE_SECURE=true and owner 2FA")
+            urls = [*self.origins, self.client_public_url]
+            if not self.origins or any(urlsplit(u).scheme != "https" or not urlsplit(u).hostname
+                                       or "*" in u or urlsplit(u).username for u in urls):
+                raise ValueError("Production requires explicit HTTPS origins and client URL")
+            if (self.sms_provider == "log" or self.email_provider == "log" or self.smsru_test
+                    or self.payment_provider == "sandbox" or self.yookassa_secret_key.startswith("test_")):
+                raise ValueError("Test providers are forbidden in production")
+            if self.yookassa_api_url != "https://api.yookassa.ru/v3":
+                raise ValueError("Production payments require the official YooKassa endpoint")
+        return self
 
     @property
     def is_production(self) -> bool:

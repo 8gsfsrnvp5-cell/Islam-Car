@@ -93,7 +93,7 @@ def test_owner_second_factor(admin):
     r = c.post("/api/auth/admin/login", json={"login": OWNER_LOGIN, "password": OWNER_PASSWORD})
     assert r.status_code == 401 and r.json()["detail"] == "totp_required"
     r = c.post("/api/auth/admin/login", json={"login": OWNER_LOGIN, "password": OWNER_PASSWORD,
-                                              "totp_code": pyotp.TOTP(secret).now()})
+                                              "totp_code": pyotp.TOTP(secret).at(__import__("time").time() + 30)})
     assert r.status_code == 200
 
 

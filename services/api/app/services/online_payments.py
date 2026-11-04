@@ -42,6 +42,8 @@ class ProviderPayment:
     amount_kopecks: int
     confirmation_url: str = ""
     paid_at: datetime | None = None
+    currency: str = "RUB"
+    test: bool = False
 
 
 class SandboxProvider:
@@ -102,6 +104,8 @@ class YooKassaProvider:
         paid_at = data.get("captured_at") if status == "succeeded" else None
         return ProviderPayment(id=data["id"], status=status, amount_kopecks=amount,
                                confirmation_url=(data.get("confirmation") or {}).get("confirmation_url", ""),
+                               currency=(data.get("amount") or {}).get("currency", ""),
+                               test=data.get("test") is not False,
                                paid_at=datetime.fromisoformat(paid_at.replace("Z", "+00:00")) if paid_at else None)
 
     def create(self, intent: PaymentIntent, description: str, return_url: str) -> ProviderPayment:
@@ -132,7 +136,7 @@ def get_payment_provider():
     if s.payment_provider == "sandbox" and not s.is_production:
         return SandboxProvider()
     if s.payment_provider == "yookassa" and s.yookassa_shop_id and s.yookassa_secret_key:
-        if s.is_production and not s.payment_receipts_confirmed:
+        if s.is_production and (not s.payment_receipts_confirmed or s.yookassa_secret_key.startswith("test_")):
             return None
         return YooKassaProvider()
     return None
@@ -202,6 +206,10 @@ def sync_intent(db: Session, intent_id: uuid.UUID) -> PaymentIntent:
         return intent
     intent.error = ""
     c = db.get(Contract, intent.contract_id)
+    if (pp.id != intent.provider_payment_id or pp.currency != "RUB"
+            or (get_settings().is_production and pp.test)):
+        needs_review(db, intent, c, "Не совпадает идентификатор, валюта или рабочий режим платежа")
+        return intent
     if pp.status == "canceled":
         intent.status = "canceled"
         return intent
@@ -213,6 +221,9 @@ def sync_intent(db: Session, intent_id: uuid.UUID) -> PaymentIntent:
     external_ref = f"{provider.name}:{pp.id}"
     existing = db.scalar(select(Payment).where(Payment.external_ref == external_ref,
                                                Payment.status == PaymentStatus.confirmed))
+    if existing and existing.contract_id != c.id:
+        needs_review(db, intent, c, "Платёж уже относится к другому договору")
+        return intent
     if existing:
         intent.status, intent.payment_id = "succeeded", existing.id
         return intent

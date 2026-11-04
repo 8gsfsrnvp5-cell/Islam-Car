@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, date, datetime
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -32,6 +32,12 @@ def record_payment(db: Session, c: Contract, *, amount_kopecks: int, received_on
                    document_ref: str, note: str = "", confirmed_by: uuid.UUID | None, source: str = "staff",
                    external_ref: str = "", report_id: uuid.UUID | None = None,
                    corrects_payment_id: uuid.UUID | None = None) -> Payment:
+    if external_ref and db.bind.dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:ref, 1))"), {"ref": external_ref})
+    c = db.scalar(select(Contract).where(Contract.id == c.id).with_for_update()
+                  .execution_options(populate_existing=True))
+    if amount_kopecks <= 0:
+        raise HTTPException(422, "Сумма платежа должна быть положительной")
     if c.status not in LIVE:
         raise HTTPException(409, "Платёж можно учесть только по подписанному договору")
     if received_on > today():
@@ -50,7 +56,8 @@ def record_payment(db: Session, c: Contract, *, amount_kopecks: int, received_on
         raise HTTPException(409, "Это поступление уже учтено")
     report = None
     if report_id:
-        report = db.get(PaymentReport, report_id)
+        report = db.scalar(select(PaymentReport).where(PaymentReport.id == report_id).with_for_update()
+                           .execution_options(populate_existing=True))
         if not report or report.contract_id != c.id or report.status != PaymentReportStatus.pending:
             raise HTTPException(409, "Сообщение об оплате не найдено или уже обработано")
     if corrects_payment_id:

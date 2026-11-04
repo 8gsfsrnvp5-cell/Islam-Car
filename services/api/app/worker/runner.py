@@ -9,10 +9,11 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db import SessionLocal
+from app.db import SessionLocal, engine
 from app.models import Job, JobStatus, WorkerHeartbeat
 from app.services import backups, messaging, online_payments, reminders, staff_tasks
 from app.worker.queue import claim, enqueue, requeue_stale
@@ -69,8 +70,26 @@ def schedule_periodic(db: Session, now: datetime) -> None:
 
 
 def run_job(job_id: uuid.UUID, now: datetime) -> bool:
+    if engine.dialect.name != "postgresql":
+        return _run_job(job_id, now)
+    with engine.connect() as lock:
+        params = {"key": str(job_id)}
+        acquired = lock.execute(text("SELECT pg_try_advisory_lock(hashtextextended(:key, 0))"), params).scalar()
+        lock.commit()
+        if not acquired:
+            return False
+        try:
+            return _run_job(job_id, now)
+        finally:
+            lock.execute(text("SELECT pg_advisory_unlock(hashtextextended(:key, 0))"), params)
+            lock.commit()
+
+
+def _run_job(job_id: uuid.UUID, now: datetime) -> bool:
     with SessionLocal() as db:
         job = db.get(Job, job_id)
+        if not job or job.status != JobStatus.running:
+            return False
         handler = HANDLERS.get(job.kind)
         try:
             if handler is None:

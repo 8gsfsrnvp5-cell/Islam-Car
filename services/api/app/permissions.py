@@ -33,6 +33,7 @@ PERMISSIONS: dict[str, set[Role]] = {
     "notifications.read": ALL_STAFF,
     "reports.read": FINANCE_VIEW,
     "audit.read": {OWN, ADM, AUD},
+    "documents.content": {OWN, ADM},  # Полные документы содержат одновременно ПД и закупочную стоимость.
     "documents.audit": {OWN, ADM, MGR, LAW, AUD},  # проверка комплектности и актуальности документов
     "templates.approve": {OWN, LAW},  # фиксирует утверждение шаблона юристом
     "knowledge.read": ALL_STAFF,

@@ -18,9 +18,10 @@ from tests.helpers import (
     create_contract,
     setup_company,
     signed_deal,
+    valid_png,
 )
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+PNG = valid_png()
 
 
 @pytest.fixture

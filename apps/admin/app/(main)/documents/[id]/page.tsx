@@ -18,7 +18,7 @@ function todayIso() {
 
 export default function DocumentPage() {
   const { id } = useParams<{ id: string }>();
-  const canWrite = useCan("contracts.write");
+  const canWrite = useCan("documents.content");
   const canSign = useCan("contracts.sign");
   const { data: doc, error, setData } = useApi<DocItem>(`/api/admin/documents/${id}`);
   const action = useAction();
