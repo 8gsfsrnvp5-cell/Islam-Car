@@ -7,6 +7,17 @@ from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def resource_directory(relative: str) -> Path:
+    source = Path(__file__).resolve()
+    for root in source.parents:
+        candidate = root / relative
+        if candidate.is_dir():
+            return candidate
+    # A packaged installation may supply the directories through environment variables.
+    # This fallback must also be safe at shallow paths such as /app/app/config.py.
+    return source.parent.parent / relative
+
+
 class Settings(BaseSettings):
     """Настройки берутся из переменных окружения или файла .env (не хранится в git)."""
 
@@ -36,10 +47,10 @@ class Settings(BaseSettings):
     require_owner_2fa: bool | None = None
 
     # Документы: каталог утверждённых шаблонов и шрифт с кириллицей для PDF
-    templates_dir: Path = Path(__file__).resolve().parents[3] / "templates" / "contracts"
+    templates_dir: Path = resource_directory("templates/contracts")
     document_font_dir: Path | None = None
     # Библиотеки знаний (legal, accounting, islamic-finance) и срок, после которого проверка считается устаревшей
-    knowledge_dir: Path = Path(__file__).resolve().parents[3] / "knowledge"
+    knowledge_dir: Path = resource_directory("knowledge")
     knowledge_stale_days: int = 180
 
     # Каналы уведомлений. "log" — тестовый режим: сообщение пишется в журнал, наружу не уходит (запрещён в production)

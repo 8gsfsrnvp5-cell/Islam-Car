@@ -279,3 +279,16 @@ def test_postgres_live_worker_is_not_requeued_after_lease_expires():
     with SessionLocal() as db:
         assert requeue_stale(db, now) == 1
         db.commit()
+
+
+def test_config_imports_at_docker_path(tmp_path):
+    from pathlib import Path
+
+    import app.config as config
+
+    namespace = {"__file__": "/app/app/config.py", "__name__": "docker_config_regression"}
+    code = Path(config.__file__).read_text()
+    exec(compile(code, namespace["__file__"], "exec"), namespace)
+    settings = namespace["Settings"](_env_file=None, templates_dir=tmp_path, knowledge_dir=tmp_path)
+    assert settings.templates_dir == tmp_path
+    assert settings.knowledge_dir == tmp_path
