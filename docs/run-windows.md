@@ -137,5 +137,14 @@ PG_RESTORE_PATH="C:/Program Files/PostgreSQL/17/bin/pg_restore.exe"
 
 Версия `pg_dump` должна быть не ниже версии сервера PostgreSQL.
 
+### Онлайн-оплата и помощник локально
+
+```
+# тестовая онлайн-оплата без денег (запрещена при ENVIRONMENT=production)
+PAYMENT_PROVIDER=sandbox
+# помощник по нормам: ключ Claude API; включает владелец в «Пользователи и настройки»
+# ANTHROPIC_API_KEY=...
+```
+
 Демо-карточки автомобилей для локальной разработки: `python -m scripts.seed_demo`
 (работает только при `ENVIRONMENT=development`, карточки помечены «ДЕМО»).

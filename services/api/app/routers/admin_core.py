@@ -30,7 +30,8 @@ from app.services.export import csv_response, money
 
 router = APIRouter(prefix="/api/admin", tags=["admin: core"])
 
-PAYMENT_METHOD_RU = {"bank_transfer": "Банковский перевод", "cash": "Наличные", "card": "Карта", "other": "Другое"}
+PAYMENT_METHOD_RU = {"bank_transfer": "Банковский перевод", "cash": "Наличные", "card": "Карта",
+                     "online": "Онлайн-оплата", "other": "Другое"}
 CONTRACT_STATUS_RU = {"draft": "Черновик", "signed": "Действует", "completed": "Исполнен", "cancelled": "Отменён"}
 
 

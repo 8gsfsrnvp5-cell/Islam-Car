@@ -41,6 +41,9 @@ class Role(enum.StrEnum):
     admin = "admin"
     manager = "manager"
     accountant = "accountant"
+    lawyer = "lawyer"                    # юрист: документы, шаблоны, юридическая библиотека
+    shariah_advisor = "shariah_advisor"  # специалист по исламскому финансированию
+    auditor = "auditor"                  # только просмотр, персональные данные скрыты
     client = "client"
 
 
@@ -110,6 +113,7 @@ class PaymentMethod(enum.StrEnum):
     bank_transfer = "bank_transfer"
     cash = "cash"
     card = "card"
+    online = "online"  # онлайн-оплата через платёжный сервис, статус проверен у провайдера
     other = "other"
 
 
@@ -225,6 +229,8 @@ class CompanySettings(Base):
     vat_payer: Mapped[bool] = mapped_column(Boolean, default=False)
     # Управленческая методика резерва — решение владельца, не правовая норма
     reserve_policy: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Помощник по библиотекам знаний: {enabled, changed_at, changed_by}
+    assistant_policy: Mapped[dict] = mapped_column(JSON, default=dict)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
@@ -434,8 +440,11 @@ class Payment(Base):
     document_ref: Mapped[str] = mapped_column(String(120))
     note: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[PaymentStatus] = mapped_column(str_enum(PaymentStatus), default=PaymentStatus.confirmed)
-    confirmed_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    # Пусто — подтверждено проверенным статусом платёжного провайдера (source = provider)
+    confirmed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    source: Mapped[str] = mapped_column(String(20), default="staff")  # staff | bank_statement | provider
+    external_ref: Mapped[str] = mapped_column(String(120), default="")
     reversed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     reversal_reason: Mapped[str] = mapped_column(Text, default="")
@@ -951,3 +960,71 @@ class AgentRun(Base):
     findings: Mapped[list] = mapped_column(JSON, default=list)
     actions: Mapped[list] = mapped_column(JSON, default=list)
     error: Mapped[str] = mapped_column(Text, default="")
+
+
+# ============================== Версия 4 ==============================
+
+
+class BankImport(Base):
+    """Загруженная банковская выписка. Один и тот же файл повторно не загружается (sha256)."""
+
+    __tablename__ = "bank_imports"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    file_name: Mapped[str] = mapped_column(String(200))
+    file_sha256: Mapped[str] = mapped_column(String(64), unique=True)
+    file_format: Mapped[str] = mapped_column(String(40))
+    account: Mapped[str] = mapped_column(String(20), default="")
+    period_from: Mapped[date | None] = mapped_column(Date)
+    period_to: Mapped[date | None] = mapped_column(Date)
+    rows_total: Mapped[int] = mapped_column(Integer, default=0)
+    rows_incoming: Mapped[int] = mapped_column(Integer, default=0)
+    rows_new: Mapped[int] = mapped_column(Integer, default=0)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class BankTransaction(Base):
+    """Входящее поступление из выписки. Платёж по договору создаётся только после подтверждения сотрудником."""
+
+    __tablename__ = "bank_transactions"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    import_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("bank_imports.id"), index=True)
+    external_key: Mapped[str] = mapped_column(String(200), unique=True)
+    doc_number: Mapped[str] = mapped_column(String(40))
+    doc_date: Mapped[date] = mapped_column(Date)
+    received_on: Mapped[date] = mapped_column(Date, index=True)
+    amount_kopecks: Mapped[int] = mapped_column(BigInteger)
+    payer_name: Mapped[str] = mapped_column(String(300), default="")
+    payer_inn: Mapped[str] = mapped_column(String(12), default="")
+    payer_account: Mapped[str] = mapped_column(String(20), default="")
+    purpose: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(20), default="new", index=True)  # new | suggested | confirmed | ignored
+    match_contract_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("contracts.id"))
+    match_score: Mapped[int] = mapped_column(Integer, default=0)
+    match_reasons: Mapped[list] = mapped_column(JSON, default=list)
+    payment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("payments.id"))
+    note: Mapped[str] = mapped_column(Text, default="")
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PaymentIntent(Base):
+    """Онлайн-оплата через платёжный сервис. Платёж учитывается только после проверки статуса у провайдера."""
+
+    __tablename__ = "payment_intents"
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    contract_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("contracts.id"), index=True)
+    client_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("clients.id"), index=True)
+    amount_kopecks: Mapped[int] = mapped_column(BigInteger)
+    provider: Mapped[str] = mapped_column(String(30))
+    provider_payment_id: Mapped[str] = mapped_column(String(100), default="", index=True)
+    status: Mapped[str] = mapped_column(String(20), default="created", index=True)
+    confirmation_url: Mapped[str] = mapped_column(String(500), default="")
+    idempotence_key: Mapped[str] = mapped_column(String(64), unique=True)
+    payment_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("payments.id"))
+    error: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

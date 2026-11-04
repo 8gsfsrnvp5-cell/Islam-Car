@@ -13,6 +13,8 @@ os.environ["STORAGE_DIR"] = tempfile.mkdtemp(prefix="islamcar-test-")
 # Внешние каналы в тестовом режиме: сообщения пишутся в журнал, наружу ничего не уходит
 os.environ["SMS_PROVIDER"] = "log"
 os.environ["EMAIL_PROVIDER"] = "log"
+os.environ["PAYMENT_PROVIDER"] = ""
+os.environ["SMSRU_API_ID"] = ""
 # Переменные окружения важнее файла .env: локальные настройки стенда не влияют на тесты
 os.environ["BACKUP_DIR"] = ""
 os.environ["REQUIRE_OWNER_2FA"] = ""

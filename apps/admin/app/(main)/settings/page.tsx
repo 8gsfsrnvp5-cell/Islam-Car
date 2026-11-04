@@ -28,6 +28,48 @@ const COMPANY_FIELDS: [string, string, string?][] = [
   ["contract_prefix", "Префикс номера договора", "Например IC → IC-2026-0001"],
 ];
 
+const STAFF_ROLES = ["admin", "manager", "accountant", "lawyer", "shariah_advisor", "auditor"];
+const ROLE_HINT: Record<string, string> = {
+  admin: "Все операции, кроме управления пользователями и утверждения налоговых правил",
+  manager: "Заявки, клиенты, автомобили, договоры, обращения",
+  accountant: "Платежи, выписки, бухгалтерия, отчёты; заключения по бухгалтерской библиотеке",
+  lawyer: "Документы, утверждение шаблонов, заключения по юридической библиотеке, проверка документов",
+  shariah_advisor: "Проверка принципов мурабахи, заключения по библиотеке исламского финансирования",
+  auditor: "Только просмотр: финансы, отчёты, журнал действий. Паспортные данные и контакты скрыты",
+};
+
+type Assistant = { enabled: boolean; configured: boolean; model: string; reason: string; changed_at: string | null; data_scope: string };
+
+function AssistantCard() {
+  const { data, error, setData } = useApi<Assistant>("/api/admin/assistant");
+  const [confirm, setConfirm] = useState(false);
+  const action = useAction();
+  if (!data) return error ? <ErrorBox error={error} /> : null;
+  const save = async (enabled: boolean) => {
+    const r = await action.run(() => api<Assistant>("/api/admin/assistant/settings",
+      { method: "PUT", json: { enabled, confirm_data_scope: confirm } }));
+    if (r) { setData(r); setConfirm(false); }
+  };
+  return (
+    <Card title="Помощник по нормам (Claude API)" subtitle="По умолчанию выключен. Включает владелец">
+      <p className="small">{data.data_scope}</p>
+      <p className="small">Состояние: {data.enabled ? <Badge tone="ok">включён · {data.model}</Badge> : <Badge>выключен</Badge>}
+        {data.reason ? <span className="muted"> — {data.reason}</span> : null}
+        {data.changed_at ? <span className="muted"> · изменено {formatDateTime(data.changed_at)}</span> : null}</p>
+      <ErrorBox error={action.error} />
+      {data.enabled ? (
+        <button className="btn btn-sm" onClick={() => save(false)} disabled={action.busy}>Выключить</button>
+      ) : data.configured ? (
+        <div className="actions">
+          <label className="small"><input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} />{" "}
+            Подтверждаю состав передаваемых данных</label>
+          <button className="btn btn-sm btn-primary" onClick={() => save(true)} disabled={action.busy || !confirm}>Включить</button>
+        </div>
+      ) : <Notice tone="info">Чтобы включить помощника, администратор сервера задаёт ANTHROPIC_API_KEY в переменных окружения.</Notice>}
+    </Card>
+  );
+}
+
 function CompanyCard() {
   const canWrite = useCan("settings.write");
   const { data, error, setData } = useApi<Company>("/api/admin/settings");
@@ -163,8 +205,9 @@ function UsersCard() {
         <Field label="ФИО"><input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required /></Field>
         <Field label="Роль">
           <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-            {["admin", "manager", "accountant"].map((r) => <option key={r} value={r}>{ROLE[r]}</option>)}
+            {STAFF_ROLES.map((r) => <option key={r} value={r}>{ROLE[r]}</option>)}
           </select>
+          <small>{ROLE_HINT[form.role]}</small>
         </Field>
         <Field label="Начальный пароль" hint="Сотрудник сменит его после входа"><input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} autoComplete="new-password" required /></Field>
         <div className="wide"><button className="btn btn-primary" disabled={action.busy}>Добавить сотрудника</button></div>
@@ -249,6 +292,7 @@ export default function SettingsPage() {
           <CompanyCard />
           {canUsers ? <UsersCard /> : null}
           {canUsers ? <BackupsCard /> : null}
+          {canUsers ? <AssistantCard /> : null}
           {canAudit ? <AuditCard /> : null}
         </div>
         <AccountCard />

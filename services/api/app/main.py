@@ -7,6 +7,9 @@ from app.db import SessionLocal
 from app.routers import (
     admin_accounting,
     admin_agents,
+    admin_analytics,
+    admin_assistant,
+    admin_bank,
     admin_cars,
     admin_checks,
     admin_contracts,
@@ -18,6 +21,7 @@ from app.routers import (
     admin_ops,
     auth,
     client,
+    online_payments,
     public,
 )
 
@@ -49,7 +53,8 @@ def create_app() -> FastAPI:
     for r in (public.router, auth.router, client.router, admin_core.router, admin_cars.router,
               admin_crm.router, admin_contracts.router, admin_documents.router, admin_ops.router,
               admin_knowledge.router, admin_accounting.router, admin_finance.router, admin_checks.router,
-              admin_agents.router):
+              admin_agents.router, admin_bank.router, admin_analytics.router, admin_assistant.router,
+              online_payments.router, online_payments.client_router, online_payments.admin_router):
         app.include_router(r)
 
     @app.get("/api/health")

@@ -87,6 +87,19 @@
 - `app/agents` — каркас (`base.py`: сессия чтения с откатом, контекст действий с проверкой прав, журнал запуска)
   и 8 агентов (`registry.py`).
 
+## Интеграции и аналитика (версия 4)
+
+- `app/services/payments.py` — единая функция учёта поступления (`record_payment`) для сотрудника, выписки и провайдера:
+  договор действует, дата не в будущем, сумма не больше остатка, документ не учитывается дважды.
+- `app/services/bank_import.py` — разбор формата 1С и сопоставление поступлений с договорами;
+  `routers/admin_bank.py` — загрузка, подтверждение, отклонение.
+- `app/services/online_payments.py` — провайдеры (тестовый, ЮKassa), создание оплаты, проверка статуса у провайдера,
+  фоновая перепроверка; `routers/online_payments.py` — кабинет, уведомления провайдера (`/api/payments/webhook/{provider}`),
+  журнал для сотрудников. HTTP-запросы к сервисам — `app/services/http.py` (стандартная библиотека).
+- `app/services/analytics.py` и `routers/admin_analytics.py` — аналитика, прогноз, XLSX (`app/services/export.py`).
+- `app/services/document_audit.py` — проверка документов; агент документов — в `app/agents/registry.py`.
+- `app/services/assistant.py` и `routers/admin_assistant.py` — помощник по нормам (Claude API через SDK `anthropic`).
+
 ## Сервисы и агенты
 
 - `services/workers` — описание фонового обработчика (код — в `services/api/app/worker`).

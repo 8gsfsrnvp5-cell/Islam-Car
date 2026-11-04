@@ -24,7 +24,7 @@ export function useCan(permission: string): boolean {
   return useMe().permissions.includes(permission);
 }
 
-type NavItem = { href: string; title: string; soon?: number; badge?: "notifications" };
+type NavItem = { href: string; title: string; soon?: number; badge?: "notifications"; permission?: string };
 
 const NAV: { group: string; items: NavItem[] }[] = [
   { group: "Операции", items: [
@@ -34,6 +34,7 @@ const NAV: { group: string; items: NavItem[] }[] = [
     { href: "/cars", title: "Реестр автомобилей" },
     { href: "/contracts", title: "Договоры" },
     { href: "/payments", title: "Рассрочки и платежи" },
+    { href: "/bank", title: "Банковские выписки", permission: "payments.read" },
     { href: "/calendar", title: "Календарь поступлений" },
     { href: "/support", title: "Обращения клиентов" },
     { href: "/tasks", title: "Задачи и сроки" },
@@ -44,11 +45,13 @@ const NAV: { group: string; items: NavItem[] }[] = [
     { href: "/finance", title: "Финансы" },
     { href: "/accounting", title: "Бухгалтерия и налоги" },
     { href: "/notifications", title: "Центр уведомлений", badge: "notifications" },
+    { href: "/analytics", title: "Аналитика и прогноз", permission: "reports.read" },
     { href: "/reports", title: "Отчёты" },
   ] },
   { group: "Знания и ИИ", items: [
     { href: "/knowledge", title: "Библиотеки знаний" },
     { href: "/agents", title: "Центр ИИ-агентов" },
+    { href: "/assistant", title: "Помощник по нормам" },
   ] },
   { group: "Система", items: [{ href: "/settings", title: "Пользователи и настройки" }] },
 ];
@@ -101,7 +104,7 @@ export function Shell({ children }: { children: ReactNode }) {
             <div key={g.group}>
               <div className="nav-group">{g.group}</div>
               <nav className="nav">
-                {g.items.map((it) => (
+                {g.items.filter((it) => !it.permission || me.data?.permissions.includes(it.permission)).map((it) => (
                   <Link key={it.href} href={it.href} className={isActive(it.href) ? "active" : ""}>
                     <span>{it.title}</span>
                     {it.soon ? <span className="soon">v{it.soon}</span> : null}

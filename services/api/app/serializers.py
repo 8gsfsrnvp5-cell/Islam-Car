@@ -181,7 +181,8 @@ def payment_dict(p: Payment) -> dict[str, Any]:
         "received_on": p.received_on, "method": p.method, "document_ref": p.document_ref,
         "note": p.note, "status": p.status, "confirmed_at": p.confirmed_at,
         "reversed_at": p.reversed_at, "reversal_reason": p.reversal_reason,
-        "corrects_payment_id": p.corrects_payment_id, "report_id": p.report_id,
+        "corrects_payment_id": p.corrects_payment_id, "report_id": p.report_id, "source": p.source,
+        "external_ref": p.external_ref,
     }
 
 

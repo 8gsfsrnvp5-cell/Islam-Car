@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.db import SessionLocal
 from app.models import Job, JobStatus, WorkerHeartbeat
-from app.services import backups, messaging, reminders, staff_tasks
+from app.services import backups, messaging, online_payments, reminders, staff_tasks
 from app.worker.queue import claim, enqueue, requeue_stale
 
 log = logging.getLogger("islamcar.worker")
@@ -28,7 +28,10 @@ HANDLERS: dict[str, Handler] = {
     "backup": lambda db, payload, now: backups.run_backup(db, now),
     "verify_backup": lambda db, payload, now: backups.verify_latest(db, now),
     "agents_daily": lambda db, payload, now: run_all_agents(now),
+    "sync_online_payments": lambda db, payload, now: online_payments.sync_pending(db, now),
 }
+
+PAYMENTS_SYNC_MINUTES = 10
 
 AGENTS_HOUR = 7
 
@@ -48,6 +51,10 @@ def schedule_periodic(db: Session, now: datetime) -> None:
     bucket = now.replace(minute=(now.minute // step) * step, second=0, microsecond=0)
     enqueue(db, "plan_reminders", {}, now, dedupe_key=f"plan_reminders:{bucket:%Y%m%dT%H%M}")
     enqueue(db, "staff_scan", {}, now, dedupe_key=f"staff_scan:{now:%Y%m%dT%H}")
+    if online_payments.get_payment_provider():
+        slot = now.replace(minute=(now.minute // PAYMENTS_SYNC_MINUTES) * PAYMENTS_SYNC_MINUTES, second=0,
+                           microsecond=0)
+        enqueue(db, "sync_online_payments", {}, now, dedupe_key=f"sync_online_payments:{slot:%Y%m%dT%H%M}")
     local_now = now.astimezone(ZoneInfo(s.company_timezone))
     agents_at = local_now.replace(hour=AGENTS_HOUR, minute=0, second=0, microsecond=0)
     enqueue(db, "agents_daily", {}, max(agents_at.astimezone(UTC), now), dedupe_key=f"agents_daily:{local_now:%Y%m%d}")

@@ -204,3 +204,44 @@ mark.lawyer { background: #fff1c2; border-bottom: 2px solid #e2a400; padding: 0 
 .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--muted); }
 .dot.ok { background: var(--ok); }
 .dot.bad { background: var(--danger); }
+
+/* ---- Графики (версия 4). Цвета рядов проверены валидатором палитры на белой карточке ---- */
+.viz, .viz-bars {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --ordinal-1: #86b6ef;
+  --ordinal-2: #2a78d6;
+  --ordinal-3: #104281;
+  --viz-grid: #e1e0d9;
+  --viz-base: #c3c2b7;
+  --viz-muted: #898781;
+}
+.viz { position: relative; }
+.viz svg { display: block; overflow: visible; }
+.viz-grid { stroke: var(--viz-grid); stroke-width: 1; }
+.viz-base { stroke: var(--viz-base); stroke-width: 1; }
+.viz-tick { fill: var(--viz-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.viz g:focus { outline: none; }
+.viz g:focus-visible rect[fill="transparent"] { stroke: var(--viz-base); }
+.viz-dim path { opacity: 0.45; }
+.viz-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.viz-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.viz-tooltip {
+  position: absolute; width: 200px; pointer-events: none; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; box-shadow: 0 4px 16px rgba(16, 24, 20, 0.12); padding: 8px 10px; font-size: 12px; z-index: 2;
+}
+.viz-tooltip-title { color: var(--muted); margin-bottom: 4px; }
+.viz-tooltip-row { display: flex; align-items: center; gap: 6px; }
+.viz-tooltip-row i { width: 12px; height: 2px; border-radius: 1px; flex: none; }
+.viz-tooltip-row strong { color: var(--ink); }
+.viz-tooltip-row span { color: var(--muted); }
+.viz-bars { display: grid; gap: 10px; }
+.viz-bar-row { display: grid; grid-template-columns: minmax(120px, 30%) 1fr; align-items: center; gap: 12px; font-size: 13px; }
+.viz-bar-row:hover .viz-bar-fill, .viz-bar-row:focus-visible .viz-bar-fill { filter: brightness(1.08); }
+.viz-bar-row:focus-visible { outline: 2px solid var(--viz-base); outline-offset: 2px; border-radius: 4px; }
+.viz-bar-label { color: var(--muted); }
+.viz-bar-track { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.viz-bar-fill { display: block; height: 16px; min-width: 2px; border-radius: 0 4px 4px 0; }
+.viz-bar-value { color: var(--ink); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.forecast-tag { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--warn);
+  background: var(--warn-soft); border-radius: 4px; padding: 1px 6px; margin-left: 8px; vertical-align: 2px; }

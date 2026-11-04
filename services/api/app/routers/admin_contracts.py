@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import (
+    BankTransaction,
     Car,
     CarStatus,
     Client,
@@ -17,7 +18,6 @@ from app.models import (
     Expense,
     OwnershipStatus,
     Payment,
-    PaymentMethod,
     PaymentReport,
     PaymentReportStatus,
     PaymentStatus,
@@ -47,8 +47,8 @@ from app.services.contracts import (
     terms_of,
 )
 from app.services.dashboard import live_ledgers
-from app.services.messaging import dispatch_payment_confirmed
-from app.services.notify import notify_client, rub
+from app.services.notify import notify_client
+from app.services.payments import record_payment
 from app.services.schedule import Terms, TermsError, build_schedule
 
 router = APIRouter(prefix="/api/admin", tags=["admin: contracts"])
@@ -253,48 +253,11 @@ def confirm_payment(data: PaymentIn, actor: Actor = Depends(require("payments.co
                     db: Session = Depends(get_db)):
     """Подтверждение поступления по банковской выписке или кассовому документу."""
     c = get_contract(db, data.contract_id)
-    if c.status not in LIVE:
-        raise HTTPException(409, "Платёж можно учесть только по подписанному договору")
-    if data.received_on > today():
-        raise HTTPException(422, "Дата поступления не может быть в будущем")
-    if data.received_on < c.contract_date:
-        raise HTTPException(422, "Дата поступления раньше даты договора")
-    outstanding = ledger_for(db, c).outstanding_kopecks
-    if data.amount_kopecks > outstanding:
-        raise HTTPException(422, f"Сумма больше остатка долга ({rub(outstanding)}). Переплату оформите отдельно.")
-    dup = db.scalar(select(Payment.id).where(
-        Payment.contract_id == c.id, Payment.status == PaymentStatus.confirmed,
-        Payment.document_ref == data.document_ref, Payment.method == data.method))
-    if dup and data.method == PaymentMethod.bank_transfer:
-        raise HTTPException(409, "Платёж с таким номером документа уже учтён")
-    report = None
-    if data.report_id:
-        report = db.get(PaymentReport, data.report_id)
-        if not report or report.contract_id != c.id or report.status != PaymentReportStatus.pending:
-            raise HTTPException(409, "Сообщение об оплате не найдено или уже обработано")
-    if data.corrects_payment_id:
-        original = db.get(Payment, data.corrects_payment_id)
-        if not original or original.contract_id != c.id or original.status != PaymentStatus.reversed:
-            raise HTTPException(409, "Исправлять можно только сторнированный платёж этого договора")
-
-    p = Payment(contract_id=c.id, amount_kopecks=data.amount_kopecks, received_on=data.received_on,
-                method=data.method, document_ref=data.document_ref, note=data.note, confirmed_by=actor.user.id,
-                report_id=data.report_id, corrects_payment_id=data.corrects_payment_id)
-    db.add(p)
-    if report:
-        report.status = PaymentReportStatus.matched
-        report.reviewed_by = actor.user.id
-        report.reviewed_at = datetime.now(UTC)
-        report.review_note = "Платёж найден и учтён"
-    db.flush()
-    sync_completion(db, c)
+    p = record_payment(db, c, amount_kopecks=data.amount_kopecks, received_on=data.received_on, method=data.method,
+                       document_ref=data.document_ref, note=data.note, confirmed_by=actor.user.id,
+                       report_id=data.report_id, corrects_payment_id=data.corrects_payment_id)
     audit.record(db, actor, "payment.confirmed", "payment", p.id, contract=c.number, amount=p.amount_kopecks,
                  received_on=p.received_on, document=p.document_ref, corrects=data.corrects_payment_id)
-    # Подтверждение оплаты: в кабинет сразу, во внешние каналы — через журнал и очередь с проверками
-    dispatch_payment_confirmed(db, c, p, datetime.now(UTC))
-    if c.status == ContractStatus.completed:
-        notify_client(db, c.client_id, "contract.completed", f"Договор № {c.number} полностью оплачен",
-                      "Обязательства по оплате исполнены.", f"/cabinet/contracts/{c.id}")
     db.commit()
     return {**payment_dict(p), "ledger_outstanding_kopecks": ledger_for(db, c).outstanding_kopecks,
             "contract_status": c.status}
@@ -314,6 +277,9 @@ def reverse_payment(payment_id: uuid.UUID, data: ReverseIn, actor: Actor = Depen
     p.reversed_at = datetime.now(UTC)
     p.reversal_reason = data.reason
     c = get_contract(db, p.contract_id)
+    # Поступление из выписки снова ждёт решения: его можно отнести к правильному договору
+    for tx in db.scalars(select(BankTransaction).where(BankTransaction.payment_id == p.id)):
+        tx.status, tx.payment_id, tx.note = "new", None, f"Платёж сторнирован: {data.reason}"
     db.flush()
     sync_completion(db, c)
     audit.record(db, actor, "payment.reversed", "payment", p.id, contract=c.number, amount=p.amount_kopecks,

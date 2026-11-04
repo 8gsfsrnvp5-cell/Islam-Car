@@ -59,7 +59,31 @@ export const PAYMENT_METHOD: Record<string, string> = {
   bank_transfer: "Банковский перевод",
   cash: "Наличные (касса)",
   card: "Банковская карта",
+  online: "Онлайн-оплата",
   other: "Другое",
+};
+
+export const PAYMENT_SOURCE: Record<string, string> = {
+  staff: "Внесено сотрудником",
+  bank_statement: "Банковская выписка",
+  provider: "Онлайн-оплата (статус проверен у сервиса)",
+};
+
+export const BANK_TX_STATUS: Record<string, string> = {
+  new: "Ждёт решения",
+  suggested: "Предложен договор",
+  confirmed: "Учтено",
+  ignored: "Не относится к договорам",
+};
+
+export const INTENT_STATUS: Record<string, string> = {
+  created: "Создана",
+  pending: "Ожидает оплаты",
+  succeeded: "Оплачено",
+  canceled: "Отменена",
+  failed: "Сервис недоступен",
+  expired: "Не завершена",
+  needs_review: "Требует проверки",
 };
 
 export const PAYMENT_STATUS: Record<string, string> = {
@@ -104,6 +128,9 @@ export const ROLE: Record<string, string> = {
   admin: "Администратор",
   manager: "Менеджер",
   accountant: "Бухгалтер",
+  lawyer: "Юрист",
+  shariah_advisor: "Специалист по исламскому финансированию",
+  auditor: "Аудитор (только просмотр)",
   client: "Покупатель",
 };
 

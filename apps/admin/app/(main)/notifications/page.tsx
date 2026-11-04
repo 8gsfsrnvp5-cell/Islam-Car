@@ -13,7 +13,7 @@ import { useAction, useApi } from "@/lib/useApi";
 
 type Rule = { id: string | null; event: string; offset_days: number; channels: string[]; enabled: boolean };
 type Policy = Record<string, string | number | string[]>;
-type ChannelState = { channel: string; connected: boolean; provider: string; test_mode: boolean };
+type ChannelState = { channel: string; connected: boolean; provider: string; test_mode: boolean; note?: string };
 type Settings = { rules: Rule[]; policy: Policy; channels: ChannelState[] };
 type Worker = { alive: boolean; last_seen: string | null; jobs: Record<string, number>; failed: { id: string; kind: string; attempts: number; error: string; finished_at: string }[] };
 
@@ -115,11 +115,12 @@ function RulesTab() {
         <div className="actions">
           {data.channels.map((c) => (
             <span key={c.channel} className="chip"><span className={`dot ${c.connected ? "ok" : "bad"}`} />{CHANNEL[c.channel]}:
-              {c.connected ? (c.test_mode ? " тестовый режим — наружу не отправляется" : ` подключён (${c.provider})`) : " не подключён"}</span>
+              {c.connected ? (c.test_mode ? " тестовый режим — наружу не отправляется" : ` подключён (${c.provider})`) : " не подключён"}
+              {c.note ? <span className="muted"> · {c.note}</span> : null}</span>
           ))}
         </div>
         <p className="small muted" style={{ marginTop: 8 }}>
-          SMS отправляются только через официального поставщика рассылок (подключается отдельно, ключи — в настройках сервера, не в GitHub).
+          SMS отправляются через SMS.ru после договора с оператором и согласования имени отправителя (ключ — в настройках сервера, не в GitHub).
           E-mail — через SMTP. Сообщения уходят только на подтверждённые контакты при наличии согласия клиента на канал.
         </p>
       </Card>

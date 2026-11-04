@@ -86,8 +86,29 @@ export type Payment = {
   reversal_reason: string;
   corrects_payment_id: string | null;
   report_id: string | null;
+  source: "staff" | "bank_statement" | "provider";
+  external_ref: string;
   contract_number?: string;
   client?: string;
+};
+
+export type BankTransaction = {
+  id: string; import_id: string; doc_number: string; doc_date: string; received_on: string; amount_kopecks: number;
+  payer_name: string; payer_inn: string; payer_account: string; purpose: string;
+  status: "new" | "suggested" | "confirmed" | "ignored";
+  match_contract_id: string | null; match_contract_number: string | null; match_score: number; match_reasons: string[];
+  payment_id: string | null; note: string; reviewed_at: string | null;
+};
+
+export type BankImport = {
+  id: string; file_name: string; file_format: string; account: string; period_from: string | null;
+  period_to: string | null; rows_total: number; rows_incoming: number; rows_new: number; created_at: string;
+};
+
+export type PaymentIntent = {
+  id: string; contract_id: string; contract_number: string | null; amount_kopecks: number; provider: string;
+  test_mode: boolean; status: string; confirmation_url: string; created_at: string;
+  provider_payment_id?: string; payment_id?: string | null; error?: string; updated_at?: string;
 };
 
 export type PaymentReport = {
