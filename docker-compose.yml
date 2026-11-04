@@ -22,10 +22,11 @@ services:
       retries: 20
 
   api:
-    build:
+    build: &api-build
       context: .
       dockerfile: services/api/Dockerfile
     image: islamcar-api
+    pull_policy: build
     restart: unless-stopped
     depends_on:
       db:
@@ -67,7 +68,9 @@ services:
 
   # Фоновый обработчик: напоминания, отправка сообщений, контроль сроков, резервные копии
   worker:
-    image: islamcar-api
+    build: *api-build
+    image: islamcar-worker
+    pull_policy: build
     restart: unless-stopped
     depends_on: [api]
     command: ["python", "-m", "app.worker"]
