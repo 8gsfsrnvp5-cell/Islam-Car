@@ -286,6 +286,7 @@ def test_config_imports_at_docker_path(tmp_path):
 
     import app.config as config
 
+    assert (config.resource_directory("knowledge") / "legal" / "records.json").is_file()
     namespace = {"__file__": "/app/app/config.py", "__name__": "docker_config_regression"}
     code = Path(config.__file__).read_text()
     exec(compile(code, namespace["__file__"], "exec"), namespace)

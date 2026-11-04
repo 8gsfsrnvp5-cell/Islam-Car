@@ -9,7 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 def resource_directory(relative: str) -> Path:
     source = Path(__file__).resolve()
-    for root in source.parents:
+    # app/knowledge is Python code; the bundled records live outside the app package.
+    for root in source.parents[1:]:
         candidate = root / relative
         if candidate.is_dir():
             return candidate
