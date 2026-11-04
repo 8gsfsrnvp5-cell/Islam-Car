@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # Документы: каталог утверждённых шаблонов и шрифт с кириллицей для PDF
     templates_dir: Path = Path(__file__).resolve().parents[3] / "templates" / "contracts"
     document_font_dir: Path | None = None
+    # Библиотеки знаний (legal, accounting, islamic-finance) и срок, после которого проверка считается устаревшей
+    knowledge_dir: Path = Path(__file__).resolve().parents[3] / "knowledge"
+    knowledge_stale_days: int = 180
 
     # Каналы уведомлений. "log" — тестовый режим: сообщение пишется в журнал, наружу не уходит (запрещён в production)
     sms_provider: str = ""

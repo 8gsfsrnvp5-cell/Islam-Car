@@ -2,8 +2,9 @@
 
 import { type StaffCar, api, formatDate, formatRub, rublesToKopecks } from "@islamic-car/shared";
 import Link from "next/link";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
+import { PositionCard, ProfitabilityCard, ScenariosCard } from "@/components/FinanceV3";
 import { useCan } from "@/components/Shell";
 import { Card, Empty, ErrorBox, Field, Loading, Notice, PageHead } from "@/components/ui";
 import { useAction, useApi } from "@/lib/useApi";
@@ -30,6 +31,8 @@ export default function FinancePage() {
   const cars = useApi<StaffCar[]>(canFinance ? "/api/admin/cars" : null);
   const [form, setForm] = useState({ spent_on: todayIso(), category: CATEGORIES[0], amount: "", description: "", car_id: "", document_ref: "" });
   const action = useAction();
+  const [contracts, setContracts] = useState<{ number: string; client: string }[]>([]);
+  const onPosition = useCallback((p: { contracts: { number: string; client: string }[] }) => setContracts(p.contracts), []);
 
   if (!canFinance) return <><PageHead title="Финансы" /><Notice tone="warn">Недостаточно прав для просмотра финансовых данных.</Notice></>;
 
@@ -50,12 +53,10 @@ export default function FinancePage() {
 
   return (
     <>
-      <PageHead title="Финансы" subtitle="Фактические расходы и результат по каждому проданному автомобилю" />
-      <Notice tone="warn" title="Что появится в версии 3">
-        Моделирование сценариев (задержка платежа, несколько неплательщиков, капитал на следующую закупку), прогноз денежного потока
-        и финансовый резерв на налоги, содержание бизнеса и возможные неплатежи. Резерв на налоги будет считаться только по
-        утверждённым налоговым правилам — ставки и суммы не выдумываются.
-      </Notice>
+      <PageHead title="Финансы" subtitle="Деньги, резерв, сценарии, расходы и результат по каждому проданному автомобилю" />
+      <PositionCard onLoaded={onPosition} />
+      <ScenariosCard contracts={contracts} />
+      <ProfitabilityCard />
 
       <Card title="Результат по проданным автомобилям" subtitle="Наценка — по условиям договора; «Вернулось вложений» — по фактически поступившим деньгам" flush>
         <ErrorBox error={results.error} />

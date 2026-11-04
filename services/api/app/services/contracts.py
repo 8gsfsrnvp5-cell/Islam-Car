@@ -143,6 +143,11 @@ def run_checks(db: Session, c: Contract) -> CheckReport:
         r.add("seller_regime", True,
               "Режим «разовая продажа личного имущества». Регулярные продажи в этом режиме недопустимы — "
               "при систематической деятельности нужна регистрация ИП/ООО.", blocking=False, info=True)
+    from app.services.car_checks import summary as car_check_summary
+    cc = car_check_summary(db, car)
+    r.add("car_checklist", cc["state"] == "ok",
+          "Проверка автомобиля до покупки завершена без замечаний" if cc["state"] == "ok"
+          else f"Проверка автомобиля до покупки: {cc['verdict']}", blocking=False)
     r.add("no_interest", c.no_interest_on_delay,
           "Проценты и штрафы за просрочку не начисляются" if c.no_interest_on_delay
           else "Договор допускает начисления за просрочку — недопустимо для модели")

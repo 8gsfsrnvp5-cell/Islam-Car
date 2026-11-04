@@ -37,5 +37,9 @@
     }
   ],
   "requires_signed_contract": false,
-  "visible_to_client": false
+  "visible_to_client": false,
+  "legal_refs": [
+    "legal.gk.429",
+    "if.murabaha.ownership"
+  ]
 }

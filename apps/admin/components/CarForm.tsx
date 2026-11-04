@@ -8,14 +8,15 @@ import { Field } from "@/components/ui";
 type Values = Record<string, string>;
 
 const TEXT_FIELDS = ["vin", "make", "model", "year", "mileage_km", "body_type", "engine", "transmission", "drive", "color",
-  "trim", "condition", "description", "ownership_status", "status", "purchase_date", "purchase_document", "max_term_months"] as const;
+  "trim", "condition", "description", "ownership_status", "status", "purchase_date", "purchase_document", "purchased_from",
+  "max_term_months"] as const;
 const MONEY_FIELDS = ["purchase_price_kopecks", "sale_price_kopecks", "min_down_payment_kopecks"] as const;
 
 function initial(car?: StaffCar): Values {
   const v: Values = {};
   for (const f of TEXT_FIELDS) v[f] = car ? String((car as Record<string, unknown>)[f] ?? "") : "";
   for (const f of MONEY_FIELDS) v[f] = car ? kopecksToInput((car as Record<string, unknown>)[f] as number | null) : "";
-  if (!car) { v.ownership_status = "purchasing"; v.status = "draft"; }
+  if (!car) { v.ownership_status = "purchasing"; v.status = "draft"; v.purchased_from = "unknown"; }
   return v;
 }
 
@@ -95,6 +96,13 @@ export function CarForm({ car, canCost, busy, onSubmit, submitLabel }: {
         <Field label="Дата покупки продавцом"><input type="date" value={v.purchase_date} onChange={set("purchase_date")} /></Field>
         <Field label="Документ о покупке" hint="Например: ДКП № 15 от 01.10.2026. Нужен для подписания договора.">
           <input value={v.purchase_document} onChange={set("purchase_document")} />
+        </Field>
+        <Field label="У кого куплен" hint="Влияет на порядок НДС при продаже (межценовая разница — для купленных у физлиц)">
+          <select value={v.purchased_from} onChange={set("purchased_from")}>
+            <option value="unknown">не указано</option>
+            <option value="individual">у физического лица</option>
+            <option value="company">у организации или ИП</option>
+          </select>
         </Field>
       </div>
 

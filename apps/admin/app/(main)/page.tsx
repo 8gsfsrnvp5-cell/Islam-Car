@@ -26,6 +26,20 @@ type Dashboard = {
   };
 };
 
+function FreeCash() {
+  const { data } = useApi<{ free_cash_kopecks: number | null; reserve: { total_kopecks: number }; cash: { as_of: string } | null }>("/api/admin/finance/position");
+  if (!data) return null;
+  return (
+    <div className="grid grid-3" style={{ marginTop: 12 }}>
+      <Link href="/finance" className="stat"><div className="label">Свободно для закупок</div>
+        <div className="value">{data.free_cash_kopecks === null ? "—" : formatRub(data.free_cash_kopecks)}</div>
+        <div className="hint">{data.cash ? `остаток на ${formatDate(data.cash.as_of)} минус резерв` : "внесите остаток денежных средств"}</div></Link>
+      <Link href="/finance" className="stat"><div className="label">Резерв</div><div className="value">{formatRub(data.reserve.total_kopecks)}</div>
+        <div className="hint">налоги, содержание бизнеса, возможные неплатежи</div></Link>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -87,7 +101,9 @@ export default function DashboardPage() {
             <Stat label="Оценочный результат периода" value={formatRub(f.estimated_result_period_kopecks)}
                   tone={f.estimated_result_period_kopecks < 0 ? "danger" : undefined} hint={f.estimated_result_note} />
           </div>
-          <Notice tone="warn" title="Налоговые обязательства">{f.taxes.message}</Notice>
+          <FreeCash />
+          <Notice tone="warn" title="Налоговые обязательства">{f.taxes.message} Расчёт по утверждённым правилам — в разделе
+            «Бухгалтерия и налоги».</Notice>
         </>
       ) : null}
 

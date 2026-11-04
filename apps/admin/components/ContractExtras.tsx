@@ -248,11 +248,36 @@ function AddendumCard({ contract }: { contract: StaffContract }) {
   );
 }
 
+type Murabaha = { items: { code: string; title: string; state: string; message: string; source: string; rule_confirmed: boolean }[];
+  verdict: string; final_note: string; failed: number };
+
+function MurabahaCard({ contract }: { contract: StaffContract }) {
+  const { data, error } = useApi<Murabaha>(`/api/admin/contracts/${contract.id}/murabaha`);
+  if (!data) return error ? <ErrorBox error={error} /> : null;
+  const mark: Record<string, string> = { ok: "✓", problem: "✕", info: "i" };
+  const tone: Record<string, string> = { ok: "ok", problem: "bad", info: "warn" };
+  return (
+    <Card title="Принципы мурабахи" subtitle={data.verdict}>
+      <ul className="checks">
+        {data.items.map((i) => (
+          <li key={i.code}>
+            <span className={`mark ${tone[i.state]}`}>{mark[i.state]}</span>
+            <span className="small"><strong>{i.title}.</strong> {i.message}
+              <span className="muted"> · {i.rule_confirmed ? "правило подтверждено специалистом" : "правило не подтверждено специалистом"}</span></span>
+          </li>
+        ))}
+      </ul>
+      <p className="small muted" style={{ marginTop: 8 }}>{data.final_note}</p>
+    </Card>
+  );
+}
+
 export function ContractExtras({ contract }: { contract: StaffContract }) {
   const live = contract.status === "signed" || contract.status === "completed";
   return (
     <>
       <DocumentsCard contract={contract} />
+      {live ? <MurabahaCard contract={contract} /> : null}
       {live ? <AddendumCard contract={contract} /> : null}
       {live ? <PledgeCard contract={contract} /> : null}
       {live ? <InsuranceCard contract={contract} /> : null}

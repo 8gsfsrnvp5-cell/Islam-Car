@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
+import { CarChecklist } from "@/components/CarChecklist";
 import { CarForm } from "@/components/CarForm";
 import { useCan } from "@/components/Shell";
 import { Badge, Card, ErrorBox, Loading, Notice, PageHead, StatusBadge } from "@/components/ui";
@@ -88,6 +89,7 @@ export default function CarPage() {
               <Notice tone="warn">Автомобиль в процессе закупки: в каталоге он отмечен соответствующим образом, договор подписать нельзя до перехода права собственности.</Notice>
             ) : null}
           </Card>
+          <CarChecklist carId={car.id} />
           <Card title="Фотографии" subtitle="JPEG, PNG или WebP до 10 МБ">
             <div className="photos">
               {car.photos.map((p) => (

@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.documents.context import build_context, missing_fields
 from app.documents.markup import lawyer_points, parse, render_text
 from app.documents.registry import Template, active_approval
+from app.knowledge.service import assess
 from app.models import Addendum, Car, Client, Contract, ContractStatus, Document, DocumentStatus
 
 
@@ -52,9 +53,19 @@ def run_checks(db: Session, tpl: Template, ctx: dict, contract: Contract | None,
     checks.append({"code": "template", "level": "ok" if approved else "warning",
                    "message": "Шаблон утверждён юристом" if approved else
                    "Шаблон не утверждён юристом: документ будет помечен «ПРОЕКТ», окончательная версия недоступна"})
-    checks.append({"code": "law_version", "level": "warning",
-                   "message": "Актуальность норм права автоматически не проверяется (библиотека знаний — версия 3). "
-                              "Требуется проверка юриста."})
+    # Юридический агент: нормы шаблона в редакции на дату договора, их источники и статус проверки
+    on = contract.contract_date if contract is not None else date.today()
+    legal = assess(db, tpl.legal_refs, on)
+    if not tpl.legal_refs:
+        checks.append({"code": "law_version", "level": "warning",
+                       "message": "Для шаблона не указаны нормы — требуется проверка юриста"})
+    else:
+        checks.append({"code": "law_version", "level": "ok" if legal["reliable"] else "warning",
+                       "message": f"Нормы на {on:%d.%m.%Y}: {legal['verdict']} "
+                                  f"(не подтверждено: {legal['unreliable_count']} из {len(legal['items'])})",
+                       "legal": [{"code": i["code"], "title": i["title"], "act": i.get("act", ""),
+                                  "article": i.get("article", ""), "source": i.get("source_hint", ""),
+                                  "reliable": i["reliable"], "problems": i["problems"]} for i in legal["items"]]})
     for point in lawyer_points(text or tpl.body):
         checks.append({"code": "lawyer_point", "level": "warning", "message": f"Спорное условие: {point}"})
     blocking = missing + [c["message"] for c in checks if c["level"] == "error" and c["code"] != "required_fields"]

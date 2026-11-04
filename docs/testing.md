@@ -11,6 +11,9 @@
 | `test_v2_notifications.py` | напоминания, отмена при оплате, согласия, подтверждение контактов, время и частота, повторы, перезапуск, второй фактор |
 | `test_v2_documents.py` | шаблоны и их утверждение, запрос недостающих данных, проекты и водяные знаки, неизменяемость, доступ покупателя, доп. соглашения |
 | `test_v2_operations.py` | залоги, страхование, задачи и контроль сроков, резервное копирование и проверка восстановления (PostgreSQL) |
+| `test_v3_knowledge.py` | библиотеки: честные статусы, заключения по SHA-256, редакция на дату, нормы в проверках документа, мурабаха |
+| `test_v3_accounting.py` | налоги только по утверждённым параметрам, смена ставки в периоде, УСН, НДФЛ, НДС с межценовой разницы, календарь, роли |
+| `test_v3_finance_agents.py` | резерв и свободные деньги, формулы сценариев, рентабельность, проверочный лист, агенты и их ограничения |
 
 ## 20 обязательных сценариев из ТЗ
 
@@ -31,13 +34,13 @@
 | 13 | Оплаченный платёж не вызывает сообщения о просрочке | ✅ | `test_paid_installment_does_not_trigger_reminder`, `test_overdue_detected_and_paid_items_not_overdue` |
 | 14 | Находится просрочка по неоплаченному договору | ✅ | `test_overdue_detected…`, `test_overdue_tasks_created_once` |
 | 15 | Отправка соблюдает правовой режим | ✅ | `test_overdue_frequency_limit_reschedules`, `test_quiet_hours_respect_client_timezone`, `test_without_consent_or_verified_contact_nothing_is_sent` |
-| 16 | Налоговый расчёт только при наличии данных и правил | ✅ частично | без правил расчёт не выполняется; сам модуль — версия 3 |
-| 17 | Юридический агент показывает источники и редакцию | ⏳ v3 | сейчас документ показывает предупреждение «Требуется проверка юриста» |
+| 16 | Налоговый расчёт только при наличии данных и правил | ✅ | `test_v3_accounting.py::test_no_tax_without_approved_rules`, `test_rate_change_inside_period_blocks_calculation` |
+| 17 | Юридический агент показывает источники и редакцию | ✅ | `test_v3_knowledge.py::test_document_shows_legal_sources_and_editions`, `test_edition_is_chosen_by_contract_date` |
 | 18 | Клиент не видит чужие данные | ✅ | `test_buyer_cannot_see_other_buyers_data`, `test_other_buyer_cannot_download_document` |
 | 19 | Ошибочный платёж исправляется с сохранением истории | ✅ | `test_wrong_payment_reversed_with_history_kept` |
 | 20 | Перезапуск не уничтожает базу и фоновые задачи | ✅ | `test_data_survives_reconnect`, `test_jobs_survive_worker_crash` |
 
-Итого: 18 сценариев покрыты полностью, 1 частично (16), 1 — в версии 3 (17).
+Итого: все 20 сценариев покрыты автотестами.
 
 ## Ручная проверка версии 2 в браузере
 

@@ -12,5 +12,11 @@
   ],
   "requires_signed_contract": true,
   "visible_to_client": true,
-  "params": []
+  "params": [],
+  "legal_refs": [
+    "legal.230fz.1",
+    "legal.230fz.7",
+    "legal.gk.395",
+    "if.murabaha.no_late_increase"
+  ]
 }

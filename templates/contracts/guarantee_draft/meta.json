@@ -32,5 +32,10 @@
       "required": false
     }
   ],
-  "visible_to_client": false
+  "visible_to_client": false,
+  "legal_refs": [
+    "legal.gk.361",
+    "legal.gk.367",
+    "if.murabaha.security"
+  ]
 }

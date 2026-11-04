@@ -94,6 +94,7 @@ class CarIn(StrictModel):
     purchase_price_kopecks: int | None = opt_kop()
     purchase_date: date | None = None
     purchase_document: str = Field(default="", max_length=300)
+    purchased_from: str = Field(default="unknown", pattern=r"^(individual|company|unknown)$")
     sale_price_kopecks: int = Field(gt=0, le=10**13)
     min_down_payment_kopecks: int | None = opt_kop()
     max_term_months: int | None = Field(default=None, ge=1, le=120)
@@ -118,6 +119,7 @@ class CarPatch(StrictModel):
     purchase_price_kopecks: int | None = opt_kop()
     purchase_date: date | None = None
     purchase_document: str | None = Field(default=None, max_length=300)
+    purchased_from: str | None = Field(default=None, pattern=r"^(individual|company|unknown)$")
     sale_price_kopecks: int | None = Field(default=None, gt=0, le=10**13)
     min_down_payment_kopecks: int | None = opt_kop()
     max_term_months: int | None = Field(default=None, ge=1, le=120)

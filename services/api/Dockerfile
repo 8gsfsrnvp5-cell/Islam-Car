@@ -23,12 +23,14 @@ COPY services/api/alembic ./alembic
 COPY services/api/alembic.ini ./
 COPY services/api/scripts ./scripts
 COPY templates/contracts ./templates/contracts
+COPY knowledge ./knowledge
 
 RUN useradd --create-home --uid 1000 islamcar && mkdir -p /data/storage /backups && chown -R islamcar /data /backups
 USER islamcar
 
 ENV STORAGE_DIR=/data/storage \
-    TEMPLATES_DIR=/app/templates/contracts
+    TEMPLATES_DIR=/app/templates/contracts \
+    KNOWLEDGE_DIR=/app/knowledge
 EXPOSE 8000
 
 # Миграции применяются при каждом старте API: идемпотентно и не трогает существующие данные

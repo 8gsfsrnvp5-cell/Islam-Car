@@ -30,6 +30,13 @@ PERMISSIONS: dict[str, set[Role]] = {
     "notifications.read": ALL_STAFF,
     "reports.read": {OWN, ADM, ACC},
     "audit.read": {OWN, ADM},
+    "knowledge.read": ALL_STAFF,
+    "knowledge.review": {OWN},           # фиксирует заключение юриста, бухгалтера или специалиста по шариату
+    "accounting.read": {OWN, ADM, ACC},
+    "accounting.write": {OWN, ACC},       # вносит параметры правил и события налогового календаря
+    "accounting.approve": {OWN},          # утверждает параметры налоговых правил
+    "agents.read": ALL_STAFF,
+    "agents.run": {OWN, ADM},
     "settings.write": {OWN},
     "users.manage": {OWN},
 }

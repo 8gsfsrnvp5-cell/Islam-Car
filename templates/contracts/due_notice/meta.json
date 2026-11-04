@@ -12,5 +12,9 @@
   ],
   "requires_signed_contract": true,
   "visible_to_client": true,
-  "params": []
+  "params": [],
+  "legal_refs": [
+    "legal.230fz.7",
+    "legal.152fz.9"
+  ]
 }

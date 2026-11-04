@@ -27,7 +27,19 @@ HANDLERS: dict[str, Handler] = {
     "staff_scan": lambda db, payload, now: staff_tasks.scan(db, now),
     "backup": lambda db, payload, now: backups.run_backup(db, now),
     "verify_backup": lambda db, payload, now: backups.verify_latest(db, now),
+    "agents_daily": lambda db, payload, now: run_all_agents(now),
 }
+
+AGENTS_HOUR = 7
+
+
+def run_all_agents(now: datetime) -> None:
+    from app.agents.base import run_agent
+    from app.agents.registry import AGENTS
+    for code, agent in AGENTS.items():
+        if code != "management":
+            run_agent(agent, now)
+    run_agent(AGENTS["management"], now)
 
 
 def schedule_periodic(db: Session, now: datetime) -> None:
@@ -36,6 +48,9 @@ def schedule_periodic(db: Session, now: datetime) -> None:
     bucket = now.replace(minute=(now.minute // step) * step, second=0, microsecond=0)
     enqueue(db, "plan_reminders", {}, now, dedupe_key=f"plan_reminders:{bucket:%Y%m%dT%H%M}")
     enqueue(db, "staff_scan", {}, now, dedupe_key=f"staff_scan:{now:%Y%m%dT%H}")
+    local_now = now.astimezone(ZoneInfo(s.company_timezone))
+    agents_at = local_now.replace(hour=AGENTS_HOUR, minute=0, second=0, microsecond=0)
+    enqueue(db, "agents_daily", {}, max(agents_at.astimezone(UTC), now), dedupe_key=f"agents_daily:{local_now:%Y%m%d}")
     if s.backup_dir:
         local = now.astimezone(ZoneInfo(s.company_timezone))
         at = local.replace(hour=s.backup_hour, minute=0, second=0, microsecond=0)

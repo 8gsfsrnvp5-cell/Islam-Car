@@ -20,6 +20,7 @@ from app.models import (
     PledgeStatus,
     StaffTask,
     TaskStatus,
+    TaxCalendarEvent,
 )
 from app.services.dashboard import live_ledgers
 from app.services.notify import notify_staff
@@ -97,6 +98,13 @@ def scan(db: Session, now: datetime) -> int:
         if now - submitted >= timedelta(days=1) and open_task(
                 db, "document_approval", f"Утвердить документ: {d.title}", "Документ ожидает утверждения больше суток.",
                 f"/documents/{d.id}", f"document_approval:{d.id}", due=today):
+            created += 1
+
+    for e in db.scalars(select(TaxCalendarEvent).where(TaxCalendarEvent.status == "open",
+                                                       TaxCalendarEvent.due_date <= today + timedelta(days=7))):
+        if open_task(db, "tax_deadline", f"Налоговый срок {e.due_date:%d.%m.%Y}: {e.title}",
+                     "Подготовить и проверить. Подача отчётности и уплата — только с подтверждения владельца.",
+                     "/accounting", f"tax_deadline:{e.id}", due=e.due_date):
             created += 1
 
     # Старые выполненные служебные задачи очереди больше не нужны
